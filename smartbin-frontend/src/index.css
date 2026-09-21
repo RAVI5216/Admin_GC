@@ -2,94 +2,590 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================================
+   DESIGN TOKENS
+   ========================================================= */
+
 :root {
   color-scheme: dark;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(56, 189, 248, 0.12), transparent 30%),
-    #08142a;
-  color: #e8eef9;
+
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+
+  --chart-tooltip-bg: #0d1526;
+  --chart-tooltip-border: rgba(148, 163, 184, 0.15);
+  --chart-tooltip-text: #e2e8f0;
 }
+
+/* =========================================================
+   LIGHT THEME
+   ========================================================= */
 
 html.light {
   color-scheme: light;
+
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-border: rgba(15, 23, 42, 0.1);
+  --chart-tooltip-text: #0f172a;
 }
 
-html.light body {
-  background: #f8fafc;
-  color: #0f172a;
-}
-
-html.light .glass-panel,
-html.light .shadow-panel,
-html.light .bg-slate-950\/80,
-html.light .bg-slate-950\/70,
-html.light .bg-slate-950\/95,
-html.light .bg-slate-950\/60,
-html.light .bg-slate-950\/90,
-html.light .bg-slate-900\/80,
-html.light .bg-slate-950,
-html.light .bg-slate-900\/70 {
-  background-color: rgba(248, 250, 252, 0.9);
-}
-
-html.light .text-slate-100,
-html.light .text-white,
-html.light .text-slate-300,
-html.light .text-slate-400,
-html.light .text-slate-500,
-html.light .text-slate-200,
-html.light .bg-slate-950\/80,
-html.light .bg-slate-950\/70,
-html.light .bg-slate-950\/95,
-html.light .bg-slate-950\/60,
-html.light .bg-slate-950\/90,
-html.light .bg-slate-900\/80,
-html.light .bg-slate-950,
-html.light .bg-slate-900\/70 {
-  color: #0f172a;
-}
-
-html.light .border-white\/10,
-html.light .border-white\/5,
-html.light .border-slate-900\/80 {
-  border-color: rgba(15, 23, 42, 0.12);
-}
-
-html, body, #root {
-  min-height: 100%;
-}
-
-body {
-  margin: 0;
-  background-color: #071223;
-}
+/* =========================================================
+   GLOBAL RESET
+   ========================================================= */
 
 * {
   box-sizing: border-box;
 }
 
-::selection {
-  background: rgba(59, 130, 246, 0.45);
-  color: white;
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
 }
 
-.scrollbar-thin::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+body {
+  min-height: 100vh;
+  background-color: #080d1a;
+  color: #e2e8f0;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  overflow-x: hidden;
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
-  border-radius: 9999px;
+html.light body {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+/* =========================================================
+   LIGHT MODE - SIDEBAR
+   ========================================================= */
+
+html.light .sidebar {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .sidebar .text-white {
+  color: #0f172a !important;
+}
+
+html.light .sidebar .text-slate-600 {
+  color: #64748b !important;
+}
+
+html.light .sidebar .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+html.light .sidebar button:hover {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+}
+
+html.light .sidebar .bg-brand-500\/15 {
+  background-color: #f0f5ff !important;
+  color: #1f5fff !important;
+}
+
+html.light .sidebar .text-brand-300 {
+  color: #4f80ff !important;
+}
+
+html.light .sidebar .text-brand-400 {
+  color: #4f80ff !important;
+}
+
+/* =========================================================
+   LIGHT MODE - HEADER/TOPBAR
+   ========================================================= */
+
+html.light .topbar {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light .topbar .text-slate-300 {
+  color: #1e293b !important;
+}
+
+html.light .topbar .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.light .topbar input {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light .topbar input::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light .topbar input:focus {
+  background-color: #f8fafc !important;
+  border-color: #1f5fff !important;
+}
+
+html.light .topbar button {
+  border-color: #cbd5e1 !important;
+  background-color: #f1f5f9 !important;
+  color: #64748b !important;
+}
+
+html.light .topbar button:hover {
+  background-color: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+  color: #1e293b !important;
+}
+
+/* =========================================================
+   LIGHT MODE - NOTIFICATION DROPDOWN
+   ========================================================= */
+
+html.light .notification-dropdown {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 8px 24px rgba(15, 23, 42, 0.05) !important;
+}
+
+html.light .notification-dropdown .text-white {
+  color: #0f172a !important;
+}
+
+html.light .notification-dropdown .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.light .notification-dropdown .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+html.light .notification-dropdown .border-white {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .notification-dropdown .bg-rose-500\/5 {
+  background-color: #fee2e2 !important;
+  border-color: #fecaca !important;
+}
+
+html.light .notification-dropdown .border-l-rose-500 {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2 !important;
+}
+
+html.light .notification-dropdown .border-l-amber-400 {
+  border-color: #fbbf24 !important;
+  background-color: #fffbeb !important;
+}
+
+html.light .notification-dropdown .bg-brand-500 {
+  background-color: #1f5fff !important;
+}
+
+html.light .notification-dropdown .bg-brand-500:hover {
+  background-color: #1749d9 !important;
+}
+
+/* =========================================================
+   LIGHT MODE PANELS
+   ========================================================= */
+
+html.light .glass-panel {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 8px 24px rgba(15, 23, 42, 0.05) !important;
+}
+
+/* =========================================================
+   LIGHT MODE - COMMON TAILWIND COLORS
+   ========================================================= */
+
+html.light .bg-slate-950 {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-slate-900 {
+  background-color: #f8fafc !important;
+}
+
+html.light .bg-slate-800 {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .bg-slate-700 {
+  background-color: #cbd5e1 !important;
+}
+
+/* =========================================================
+   LIGHT MODE - BACKGROUND COLORS
+   ========================================================= */
+
+html.light [class*="bg-white"] {
+  background-color: #f1f5f9 !important;
+}
+
+/* =========================================================
+   LIGHT MODE - TEXT
+   ========================================================= */
+
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-600 {
+  color: #475569 !important;
+}
+
+/* =========================================================
+   LIGHT MODE - BORDERS
+   ========================================================= */
+
+html.light .border-white\/5,
+html.light .border-white\/8,
+html.light .border-white\/10,
+html.light [class*="border-white"] {
+  border-color: rgba(15, 23, 42, 0.09) !important;
+}
+
+/* =========================================================
+   LIGHT MODE - HOVER STATES
+   ========================================================= */
+
+html.light button:hover {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .hover\:bg-rose-500\/10:hover {
+  background-color: #fee2e2 !important;
+}
+
+html.light .hover\:text-slate-200:hover {
+  color: #1e293b !important;
+}
+
+html.light .hover\:text-slate-300:hover {
+  color: #334155 !important;
+}
+
+html.light .hover\:text-rose-300:hover {
+  color: #ef4444 !important;
+}
+
+/* =========================================================
+   LIGHT MODE - CARDS & CONTAINERS
+   ========================================================= */
+
+html.light [class*="rounded"] {
+  background-color: inherit;
+}
+
+html.light .rounded-xl {
+  background-color: inherit;
+}
+
+html.light .ring-brand-500\/20 {
+  --tw-ring-color: rgba(31, 95, 255, 0.2) !important;
+}
+
+html.light .bg-emerald-500\/10 {
+  background-color: #f0fdf4 !important;
+}
+
+html.light .text-emerald-300 {
+  color: #10b981 !important;
+}
+
+html.light .text-emerald-400 {
+  color: #10b981 !important;
+}
+
+html.light .bg-slate-700\/40 {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .ring-slate-600\/20 {
+  --tw-ring-color: rgba(100, 116, 139, 0.2) !important;
+}
+
+html.light .text-slate-100 {
+  color: #0f172a !important;
+}
+
+/* =========================================================
+   LIGHT MODE - BADGE & LABEL COLORS
+   ========================================================= */
+
+html.light .bg-amber-500\/10 {
+  background-color: #fffbeb !important;
+}
+
+html.light .text-amber-300 {
+  color: #fbbf24 !important;
+}
+
+html.light .text-amber-400 {
+  color: #fbbf24 !important;
+}
+
+html.light .bg-rose-500\/5 {
+  background-color: #fef2f2 !important;
+}
+
+html.light .text-rose-300 {
+  color: #ef4444 !important;
+}
+
+html.light .text-rose-500 {
+  color: #ef4444 !important;
+}
+
+html.light .border-rose-500 {
+  border-color: #ef4444 !important;
+}
+
+html.light .bg-amber-400\/20 {
+  background-color: #fef3c7 !important;
+}
+
+html.light .border-l-amber-400 {
+  border-color: #fbbf24 !important;
+}
+
+html.light .border-l-rose-500 {
+  border-color: #ef4444 !important;
+}
+
+/* =========================================================
+   LIGHT MODE - FORM ELEMENTS
+   ========================================================= */
+
+html.light textarea {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light select {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* =========================================================
+   LIGHT MODE - CHART CONTAINERS
+   ========================================================= */
+
+html.light [class*="bg-slate-900\/50"] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light [class*="fill-bar"] {
+  background-color: inherit;
+}
+
+/* =========================================================
+   LIGHT MODE - LINKS & INTERACTIVE ELEMENTS
+   ========================================================= */
+
+html.light a {
+  color: #1f5fff !important;
+}
+
+html.light a:hover {
+  color: #1749d9 !important;
+}
+
+html.light .underline {
+  text-decoration: underline;
+}
+
+html.light .line-through {
+  text-decoration: line-through;
+}
+
+/* =========================================================
+   LIGHT MODE - LOADING & EMPTY STATES
+   ========================================================= */
+
+html.light .animate-spin {
+  color: #1f5fff !important;
+}
+
+html.light .opacity-50 {
+  opacity: 0.5;
+}
+
+html.light .opacity-75 {
+  opacity: 0.75;
+}
+
+/* =========================================================
+   SHARED PANELS
+   ========================================================= */
+
+.glass-panel {
+  background: rgba(13, 21, 38, 0.88);
+  /* backdrop-filter: blur(20px); */
+  -webkit-backdrop-filter: blur(20px);
+
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.shadow-card {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.25),
+    0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
 .shadow-panel {
-  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.3),
+    0 8px 32px rgba(0, 0, 0, 0.22);
 }
 
-.glass-panel {
-  background: rgba(10, 25, 48, 0.78);
-  backdrop-filter: blur(18px);
-  border: 1px solid rgba(148, 163, 184, 0.14);
+html.light .shadow-panel {
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 8px 24px rgba(15, 23, 42, 0.05) !important;
+}
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.28);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.15);
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.3);
+}
+
+/* =========================================================
+   ANIMATIONS
+   ========================================================= */
+
+.fill-bar {
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.live-dot {
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+/* =========================================================
+   MAP MARKER
+   ========================================================= */
+
+.live-location-wrapper {
+  width: 28px;
+  height: 28px;
+}
+
+.live-location-marker {
+  width: 100%;
+  height: 100%;
+
+  border-radius: 50%;
+
+  background: rgba(14, 165, 233, 0.18);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  animation: pulse-ring 1.4s infinite ease-in-out;
+}
+
+.live-location-core {
+  width: 12px;
+  height: 12px;
+
+  border-radius: 50%;
+
+  background: #38bdf8;
+
+  box-shadow: 0 0 0 5px rgba(56, 189, 248, 0.22);
+}
+
+@keyframes pulse-ring {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
 }

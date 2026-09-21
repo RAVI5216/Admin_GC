@@ -5,19 +5,32 @@ interface StatCardProps {
   value: string | number;
   icon: ReactNode;
   highlight?: string;
+  accent?: 'blue' | 'emerald' | 'amber' | 'rose';
 }
 
-export default function StatCard({ label, value, icon, highlight }: StatCardProps) {
+const accentMap = {
+  blue:    { icon: 'bg-brand-500/10 text-brand-400', bar: 'bg-brand-500'   },
+  emerald: { icon: 'bg-emerald-500/10 text-emerald-400', bar: 'bg-emerald-500' },
+  amber:   { icon: 'bg-amber-500/10 text-amber-400',   bar: 'bg-amber-400'  },
+  rose:    { icon: 'bg-rose-500/10 text-rose-400',     bar: 'bg-rose-500'   },
+};
+
+export default function StatCard({ label, value, icon, highlight, accent = 'blue' }: StatCardProps) {
+  const colors = accentMap[accent];
   return (
-    <div className="glass-panel rounded-[28px] border border-white/10 p-5 shadow-panel transition hover:-translate-y-0.5 hover:bg-slate-900/70">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm uppercase tracking-[0.24em] text-slate-400">{label}</p>
-          <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
+    <div className="glass-panel shadow-card rounded-2xl p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-panel">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-widest text-slate-500">{label}</p>
+          <p className="mt-2.5 text-3xl font-semibold tracking-tight text-white">{value}</p>
         </div>
-        <div className="rounded-3xl bg-brand-500/10 p-3 text-brand-300">{icon}</div>
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${colors.icon}`}>
+          {icon}
+        </div>
       </div>
-      {highlight ? <p className="mt-4 text-sm text-brand-200">{highlight}</p> : null}
+      {highlight && (
+        <p className="mt-3 text-xs text-slate-500">{highlight}</p>
+      )}
     </div>
   );
 }

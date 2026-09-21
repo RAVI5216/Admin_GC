@@ -46,7 +46,7 @@ const computeTotals = (bins: SmartBinData[]) => {
   };
 };
 
-const createAlertsFromBins = (bins: SmartBinData[]) =>
+const createAlertsFromBins = (bins: SmartBinData[]): SmartBinPayload['alerts'] =>
   bins
     .filter((bin) => bin.status === 'full' || bin.status === 'warning' || bin.status === 'offline')
     .slice(-6)
@@ -82,22 +82,44 @@ const getCoordinateFromPayload = (message: Record<string, unknown>, keys: string
 
 const parseRawBin = (message: Record<string, unknown>): SmartBinData | null => {
   const deviceId = typeof message.deviceId === 'string' ? message.deviceId : undefined;
-  const timestamp = typeof message.timestamp === 'string' ? message.timestamp : undefined;
+  
+  // Handle both old format (timestamp) and EC2 format (lastUpdated)
+  const timestamp = typeof message.timestamp === 'string' ? message.timestamp : typeof message.lastUpdated === 'string' ? message.lastUpdated : undefined;
+  
   if (!deviceId || !timestamp) {
     return null;
   }
 
-  const fillLevel = parseNumber(message.fillLevel) ?? parseNumber(message.level) ?? 0;
-  const status: BinStatus =
-    typeof message.status === 'string' && ['online', 'offline', 'full', 'warning', 'normal'].includes(message.status)
-      ? (message.status as BinStatus)
-      : fillLevel >= 90
-      ? 'full'
-      : fillLevel >= 70
-      ? 'warning'
-      : 'online';
+  // Map fillPercentage (EC2 format) to fillLevel, fallback to level field
+  const fillLevel = parseNumber(message.fillPercentage) ?? parseNumber(message.fillLevel) ?? parseNumber(message.level) ?? 0;
+  
+  // Determine status from explicit status field or derive from fillLevel
+  let status: BinStatus;
+  if (typeof message.status === 'string') {
+    // Map common status values
+    if (['Almost Full', 'warning'].includes(message.status)) {
+      status = 'warning';
+    } else if (['full'].includes(message.status)) {
+      status = 'full';
+    } else if (['offline'].includes(message.status)) {
+      status = 'offline';
+    } else {
+      status = 'online';
+    }
+  } else {
+    // Derive status from fillLevel or online boolean
+    if (message.online === false) {
+      status = 'offline';
+    } else if (fillLevel >= 90) {
+      status = 'full';
+    } else if (fillLevel >= 70) {
+      status = 'warning';
+    } else {
+      status = 'online';
+    }
+  }
 
-  return {
+  const bin: SmartBinData = {
     deviceId,
     location: typeof message.location === 'string' ? message.location : `Bin ${deviceId}`,
     latitude: getCoordinateFromPayload(message, ['latitude', 'lat']),
@@ -110,7 +132,13 @@ const parseRawBin = (message: Record<string, unknown>): SmartBinData | null => {
     rssi: parseNumber(message.rssi) ?? 0,
     status,
     lastUpdated: timestamp,
+    // EC2 IoT Service optional fields
+    distance: parseNumber(message.distance),
+    uptime: parseNumber(message.uptime),
+    online: typeof message.online === 'boolean' ? message.online : undefined,
   };
+
+  return bin;
 };
 
 const buildPayloadFromMessage = (message: unknown, previousData: SmartBinPayload | null): SmartBinPayload | null => {
@@ -133,7 +161,7 @@ const buildPayloadFromMessage = (message: unknown, previousData: SmartBinPayload
         gasLevelHistory: [],
         humidityHistory: [],
       },
-      alerts: payloadAlerts && payloadAlerts.length > 0 ? payloadAlerts : createAlertsFromBins(bins),
+      alerts: (payloadAlerts && payloadAlerts.length > 0 ? payloadAlerts : createAlertsFromBins(bins)) as SmartBinPayload['alerts'],
     };
   }
 
@@ -160,7 +188,7 @@ const buildPayloadFromMessage = (message: unknown, previousData: SmartBinPayload
       gasLevelHistory: [...(previousData?.charts.gasLevelHistory ?? []), gasPoint].slice(-12),
       humidityHistory: [...(previousData?.charts.humidityHistory ?? []), humidityPoint].slice(-12),
     },
-    alerts: createAlertsFromBins(updatedBins),
+    alerts: createAlertsFromBins(updatedBins) as SmartBinPayload['alerts'],
   };
 };
 

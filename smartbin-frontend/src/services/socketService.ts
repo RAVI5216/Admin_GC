@@ -3,7 +3,9 @@ import type { SmartBinPayload } from '../types/smartbin';
 
 type SocketEvent = 'connect' | 'disconnect' | 'smartbin-data' | 'connect_error';
 
-const BACKEND_URL = 'http://localhost:5000';
+// Use environment variable for backend URL, default to localhost for development
+// @ts-ignore - import.meta.env is provided by Vite at build time
+const BACKEND_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000';
 
 class SocketService {
   socket: Socket | null = null;

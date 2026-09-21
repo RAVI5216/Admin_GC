@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import StatCard from '../components/StatCard';
 import ChartCard from '../components/ChartCard';
 import { useSmartBinData } from '../hooks/useSmartBinData';
+import { Signal } from 'lucide-react';
 
 function AnalyticsPage() {
   const { data, connected } = useSmartBinData();
@@ -9,133 +10,154 @@ function AnalyticsPage() {
   const metrics = useMemo(() => {
     if (!data) {
       return [
-        { label: 'Bins Collected', value: '—', icon: '♻️', highlight: 'Waiting for hardware telemetry' },
-        { label: 'Route Efficiency', value: '—', icon: '📍', highlight: 'Connect an ESP32 device to begin' },
-        { label: 'Avg Fill Level', value: '—', icon: '📈', highlight: 'Fill values will appear here live' },
-        { label: 'Alerts', value: '—', icon: '⚠️', highlight: 'Live alerts stream in automatically' },
+        { label: 'Bins Collected',   value: '—', icon: '♻️', highlight: 'Waiting for hardware telemetry', accent: 'blue' as const },
+        { label: 'Route Efficiency', value: '—', icon: '📍', highlight: 'Connect an ESP32 device to begin', accent: 'emerald' as const },
+        { label: 'Avg Fill Level',   value: '—', icon: '📈', highlight: 'Fill values will appear here live', accent: 'amber' as const },
+        { label: 'Alerts',           value: '—', icon: '⚠️', highlight: 'Live alerts stream in automatically', accent: 'rose' as const },
       ];
     }
-
-    const avgFill = data.bins.length > 0 ? Math.round(data.bins.reduce((sum, bin) => sum + bin.fillLevel, 0) / data.bins.length) : 0;
-    const highestFill = data.bins.length > 0 ? Math.max(...data.bins.map((bin) => bin.fillLevel)) : 0;
-    const alertCount = data.alerts.length;
-
+    const avgFill     = data.bins.length > 0 ? Math.round(data.bins.reduce((s, b) => s + b.fillLevel, 0) / data.bins.length) : 0;
+    const highestFill = data.bins.length > 0 ? Math.max(...data.bins.map((b) => b.fillLevel)) : 0;
+    const alertCount  = data.alerts.length;
     return [
-      { label: 'Bins Collected', value: data.totals.collectionsToday, icon: '♻️', highlight: `${data.totals.totalBins} bins tracked live` },
-      { label: 'Route Efficiency', value: `${Math.max(70, 100 - highestFill + 10)}%`, icon: '📍', highlight: 'Updated from the latest hardware packet' },
-      { label: 'Avg Fill Level', value: `${avgFill}%`, icon: '📈', highlight: `${data.totals.fullBins} bins currently need attention` },
-      { label: 'Alerts', value: alertCount, icon: '⚠️', highlight: connected ? 'Streaming in real time' : 'Waiting for connection' },
+      { label: 'Bins Collected',   value: data.totals.collectionsToday,                 icon: '♻️', highlight: `${data.totals.totalBins} bins tracked live`,                accent: 'blue'    as const },
+      { label: 'Route Efficiency', value: `${Math.max(70, 100 - highestFill + 10)}%`,   icon: '📍', highlight: 'Updated from latest hardware packet',                      accent: 'emerald' as const },
+      { label: 'Avg Fill Level',   value: `${avgFill}%`,                                icon: '📈', highlight: `${data.totals.fullBins} bins need attention`,               accent: 'amber'   as const },
+      { label: 'Alerts',           value: alertCount,                                    icon: '⚠️', highlight: connected ? 'Streaming in real time' : 'Waiting for conn.', accent: 'rose'    as const },
     ];
   }, [connected, data]);
 
   const trendData = useMemo(() => {
-    if (!data?.charts.fillLevelHistory?.length) {
-      return [48, 56, 62, 58, 71, 69, 78];
-    }
-
-    return data.charts.fillLevelHistory.slice(-7).map((point) => Math.min(100, Math.max(8, Math.round(point.value))));
+    if (!data?.charts.fillLevelHistory?.length) return [48, 56, 62, 58, 71, 69, 78];
+    return data.charts.fillLevelHistory.slice(-7).map((p) => Math.min(100, Math.max(8, Math.round(p.value))));
   }, [data]);
 
   const zoneData = useMemo(() => {
     if (!data?.bins.length) {
       return [
-        { zone: 'North', value: 0 },
+        { zone: 'North',   value: 0 },
         { zone: 'Central', value: 0 },
-        { zone: 'East', value: 0 },
-        { zone: 'West', value: 0 },
+        { zone: 'East',    value: 0 },
+        { zone: 'West',    value: 0 },
       ];
     }
-
     const grouped = data.bins.reduce<Record<string, number[]>>((acc, bin) => {
       const key = bin.location?.split(' ')[0] || 'Zone';
       if (!acc[key]) acc[key] = [];
       acc[key].push(bin.fillLevel);
       return acc;
     }, {});
-
-    return Object.entries(grouped)
-      .slice(0, 4)
-      .map(([zone, values]) => ({
-        zone,
-        value: Math.round(values.reduce((sum, value) => sum + value, 0) / values.length),
-      }));
+    return Object.entries(grouped).slice(0, 4).map(([zone, vals]) => ({
+      zone,
+      value: Math.round(vals.reduce((s, v) => s + v, 0) / vals.length),
+    }));
   }, [data]);
 
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
   return (
-    <div className="space-y-6">
-      <div className="overflow-hidden rounded-[32px] border border-emerald-400/20 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950/70 p-6 shadow-[0_25px_80px_rgba(0,0,0,0.35)]">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-sm text-emerald-200">
+    <div className="space-y-5">
+
+      {/* Page hero */}
+      <div className="glass-panel shadow-card overflow-hidden rounded-2xl p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+              connected
+                ? 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20'
+                : 'bg-slate-700/40 text-slate-400 ring-1 ring-slate-600/20'
+            }`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-400 live-dot' : 'bg-slate-500'}`} />
               {connected ? 'Live operational pulse' : 'Waiting for hardware stream'}
             </div>
-            <h3 className="mt-4 text-3xl font-semibold text-white">Analytics that respond to every ESP32 update.</h3>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Each bin message from your hardware feeds the trend, capacity, and alert views automatically.
+            <h1 className="text-xl font-semibold text-white">Analytics</h1>
+            <p className="mt-0.5 text-sm text-slate-500">
+              Each ESP32 message feeds the trend, capacity, and alert views automatically.
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur">
-            <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Current status</p>
-            <p className="mt-1 text-2xl font-semibold text-white">{connected ? 'Connected' : 'Offline'}</p>
+          <div className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.04] px-4 py-2.5">
+            <Signal size={16} className={connected ? 'text-emerald-400' : 'text-slate-500'} />
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-slate-500">Status</p>
+              <p className="text-sm font-semibold text-white">{connected ? 'Connected' : 'Offline'}</p>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
+      {/* Metric cards */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((m) => (
           <StatCard
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            icon={<span className="text-xl">{metric.icon}</span>}
-            highlight={metric.highlight}
+            key={m.label}
+            label={m.label}
+            value={m.value}
+            icon={<span className="text-lg">{m.icon}</span>}
+            highlight={m.highlight}
+            accent={m.accent}
           />
         ))}
       </div>
 
+      {/* Charts */}
       <div className="grid gap-5 xl:grid-cols-2">
-        <ChartCard title="Collection trend" helpText="Live fill-level movement from the latest device events">
-          <div className="flex h-full flex-col justify-between">
-            <div className="flex items-end gap-3 rounded-[24px] border border-white/10 bg-slate-950/60 p-4">
-              {trendData.map((value, index) => (
-                <div key={`${value}-${index}`} className="flex flex-1 flex-col items-center gap-2">
-                  <div className="flex h-44 w-full items-end rounded-2xl bg-slate-800/80 p-1">
+
+        {/* Collection trend bar chart */}
+        <ChartCard title="Collection trend" helpText="Weekly fill-level movement from the latest device events">
+          <div className="flex h-full flex-col gap-3">
+            <div className="flex flex-1 items-end gap-2 rounded-xl border border-white/[0.06] bg-slate-900/50 p-4">
+              {trendData.map((val, i) => (
+                <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
+                  <div className="flex w-full flex-1 items-end">
                     <div
-                      className="w-full rounded-xl bg-gradient-to-t from-emerald-500 via-teal-400 to-cyan-300"
-                      style={{ height: `${value}%` }}
+                      className="w-full rounded-lg bg-gradient-to-t from-brand-600 to-brand-400 transition-all duration-500"
+                      style={{ height: `${val}%` }}
                     />
                   </div>
-                  <span className="text-xs uppercase tracking-[0.24em] text-slate-400">
-                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'][index]}
-                  </span>
+                  <span className="text-[10px] font-medium text-slate-500">{days[i]}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
-              <span>{connected ? 'Updated from the latest bin heartbeat' : 'Waiting for live updates'}</span>
-              <span className="font-semibold text-white">{data ? `${Math.max(...trendData)}% peak` : 'No data yet'}</span>
+            <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs">
+              <span className="text-slate-500">{connected ? 'Updated from latest bin heartbeat' : 'Waiting for live updates'}</span>
+              <span className="font-semibold text-white">{data ? `${Math.max(...trendData)}% peak` : '—'}</span>
             </div>
           </div>
         </ChartCard>
 
-        <ChartCard title="Capacity by zone" helpText="Current pressure levels based on incoming bin data">
-          <div className="flex h-full flex-col gap-4">
-            {zoneData.map((item) => (
-              <div key={item.zone} className="rounded-[20px] border border-white/10 bg-slate-950/60 p-4">
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span className="text-slate-300">{item.zone}</span>
-                  <span className="font-semibold text-white">{item.value}%</span>
-                </div>
-                <div className="h-2.5 rounded-full bg-slate-800">
-                  <div
-                    className="h-2.5 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400"
-                    style={{ width: `${Math.max(6, item.value)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-            <div className="rounded-[20px] border border-emerald-400/20 bg-emerald-500/10 p-4 text-sm text-emerald-100">
-              {connected ? 'The latest hardware messages are driving these values now.' : 'Connect your ESP32 device to begin populating this view.'}
+        {/* Capacity by zone */}
+        <ChartCard title="Capacity by zone" helpText="Current fill pressure based on incoming bin telemetry">
+          <div className="flex h-full flex-col justify-between gap-3">
+            <div className="space-y-3">
+              {zoneData.map((item) => {
+                const color =
+                  item.value > 80 ? 'bg-rose-500'
+                  : item.value > 60 ? 'bg-amber-400'
+                  : 'bg-emerald-500';
+                return (
+                  <div key={item.zone}>
+                    <div className="mb-1.5 flex items-center justify-between text-xs">
+                      <span className="font-medium text-slate-300">{item.zone}</span>
+                      <span className="font-semibold text-white">{item.value}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+                      <div
+                        className={`h-full rounded-full fill-bar ${color}`}
+                        style={{ width: `${Math.max(4, item.value)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className={`rounded-xl px-4 py-3 text-xs ${
+              connected
+                ? 'bg-emerald-500/5 text-emerald-400 ring-1 ring-emerald-500/15'
+                : 'bg-slate-800/40 text-slate-500'
+            }`}>
+              {connected
+                ? 'Latest hardware messages are driving these values now.'
+                : 'Connect your ESP32 device to populate this view.'}
             </div>
           </div>
         </ChartCard>

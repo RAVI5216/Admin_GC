@@ -1,113 +1,172 @@
 import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { ShieldCheck, Thermometer, Wind, BatteryCharging, Wifi, Droplet } from 'lucide-react';
+import {
+  Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts';
+import { ShieldCheck, Thermometer, Wind, BatteryCharging, Droplet, MapPin } from 'lucide-react';
 import { useSmartBinData } from '../hooks/useSmartBinData';
 import StatusBadge from '../components/StatusBadge';
 
-function BinDetailsPage() {
-  const { id } = useParams();
-  const { data } = useSmartBinData();
+/* ── Telemetry tile ────────────────────────────────────────────── */
+function TelemetryTile({
+  icon,
+  label,
+  value,
+  accent = 'blue',
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  accent?: 'blue' | 'sky' | 'emerald' | 'violet' | 'amber';
+}) {
+  const iconBg: Record<string, string> = {
+    blue:    'bg-brand-500/10 text-brand-300',
+    sky:     'bg-sky-500/10 text-sky-300',
+    emerald: 'bg-emerald-500/10 text-emerald-300',
+    violet:  'bg-violet-500/10 text-violet-300',
+    amber:   'bg-amber-400/10 text-amber-300',
+  };
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+      <div className={`mb-3 inline-flex items-center gap-1.5 rounded-lg p-2 ${iconBg[accent]}`}>
+        {icon}
+        <span className="text-[10px] font-semibold uppercase tracking-widest">{label}</span>
+      </div>
+      <p className="text-3xl font-bold tracking-tight text-white">{value}</p>
+    </div>
+  );
+}
 
-  const bin = useMemo(() => data?.bins.find((item) => item.deviceId === id), [data, id]);
+function BinDetailsPage() {
+  const { id }   = useParams();
+  const { data } = useSmartBinData();
+  const bin      = useMemo(() => data?.bins.find((b) => b.deviceId === id), [data, id]);
 
   if (!bin) {
     return (
-      <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-10 text-slate-300 shadow-panel">
-        <p className="text-lg font-medium text-white">Select a bin from the fleet to view live telemetry.</p>
+      <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-white/[0.06] bg-slate-900/60 text-center">
+        <div>
+          <p className="text-base font-semibold text-white">Select a bin from the fleet</p>
+          <p className="mt-1.5 text-sm text-slate-500">Navigate to Bin Monitoring and click a row.</p>
+        </div>
       </div>
     );
   }
 
-  const chartData = data?.charts.fillLevelHistory.slice(-12) ?? [];
+  const chartData    = data?.charts.fillLevelHistory.slice(-12) ?? [];
+  const fillColor    = bin.fillLevel > 80 ? 'text-rose-300' : bin.fillLevel > 60 ? 'text-amber-300' : 'text-emerald-300';
+  const fillBarColor = bin.fillLevel > 80 ? 'bg-rose-500'   : bin.fillLevel > 60 ? 'bg-amber-400'   : 'bg-emerald-500';
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-5">
+
+      {/* Header */}
+      <div className="glass-panel shadow-card rounded-2xl p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Bin Details</p>
-            <h3 className="mt-2 text-3xl font-semibold text-white">{bin.location}</h3>
-            <p className="mt-2 text-sm text-slate-400">Device ID: {bin.deviceId}</p>
+            <p className="text-xs font-medium uppercase tracking-widest text-slate-500">Bin Details</p>
+            <h1 className="mt-1.5 text-2xl font-semibold text-white">{bin.location}</h1>
+            <p className="mt-1 text-sm text-slate-500">Device ID: <span className="font-mono text-slate-300">{bin.deviceId}</span></p>
           </div>
           <StatusBadge status={bin.status} />
         </div>
+
+        {/* Fill level hero */}
+        <div className="mt-5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium uppercase tracking-widest text-slate-500">Current Fill Level</p>
+            <p className={`text-2xl font-bold ${fillColor}`}>{bin.fillLevel}%</p>
+          </div>
+          <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-800">
+            <div className={`h-full rounded-full fill-bar ${fillBarColor}`} style={{ width: `${bin.fillLevel}%` }} />
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <div className="space-y-5 rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-3xl bg-slate-950/70 p-5">
-              <div className="flex items-center gap-3 text-brand-300"><Thermometer size={18} /><span className="text-sm uppercase tracking-[0.2em]">Temperature</span></div>
-              <p className="mt-5 text-4xl font-semibold text-white">{bin.temperature}°C</p>
-            </div>
-            <div className="rounded-3xl bg-slate-950/70 p-5">
-              <div className="flex items-center gap-3 text-sky-300"><Droplet size={18} /><span className="text-sm uppercase tracking-[0.2em]">Fill Level</span></div>
-              <p className="mt-5 text-4xl font-semibold text-white">{bin.fillLevel}%</p>
-            </div>
-            <div className="rounded-3xl bg-slate-950/70 p-5">
-              <div className="flex items-center gap-3 text-emerald-300"><BatteryCharging size={18} /><span className="text-sm uppercase tracking-[0.2em]">Battery</span></div>
-              <p className="mt-5 text-4xl font-semibold text-white">{bin.battery}%</p>
-            </div>
-            <div className="rounded-3xl bg-slate-950/70 p-5">
-              <div className="flex items-center gap-3 text-violet-300"><Wind size={18} /><span className="text-sm uppercase tracking-[0.2em]">Signal</span></div>
-              <p className="mt-5 text-4xl font-semibold text-white">{bin.rssi} dBm</p>
+      {/* Two-column content */}
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+
+        {/* Left: telemetry + chart */}
+        <div className="space-y-5">
+          <div className="glass-panel shadow-card rounded-2xl p-5">
+            <h2 className="mb-4 text-sm font-semibold text-white">Live Telemetry</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <TelemetryTile icon={<Thermometer size={14} />}    label="Temperature" value={`${bin.temperature}°C`} accent="amber" />
+              <TelemetryTile icon={<Droplet size={14} />}        label="Fill Level"  value={`${bin.fillLevel}%`}   accent="sky"   />
+              <TelemetryTile icon={<BatteryCharging size={14} />}label="Battery"     value={`${bin.battery}%`}     accent="emerald" />
+              <TelemetryTile icon={<Wind size={14} />}           label="Signal"      value={`${bin.rssi} dBm`}     accent="violet" />
             </div>
           </div>
 
-          <div className="rounded-[28px] bg-slate-950/70 p-5">
-            <div className="mb-5 flex items-center gap-3 text-slate-300">
-              <ShieldCheck size={18} />
-              <span className="text-sm uppercase tracking-[0.2em]">Live telemetry charts</span>
+          {/* Fill level chart */}
+          <div className="glass-panel shadow-card rounded-2xl p-5">
+            <div className="mb-4 flex items-center gap-2 text-slate-400">
+              <ShieldCheck size={15} />
+              <span className="text-sm font-semibold text-white">Fill Level History</span>
             </div>
-            <div className="h-[320px]">
+            <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ left: -20, right: -20, top: 10, bottom: 5 }}>
-                  <CartesianGrid opacity={0.12} vertical={false} />
-                  <XAxis dataKey="time" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: '#0b1728', border: '1px solid rgba(148,163,184,0.18)' }} />
-                  <Line type="monotone" dataKey="value" stroke="#38bdf8" strokeWidth={3} dot={false} />
-                </LineChart>
+                <AreaChart data={chartData} margin={{ left: -20, right: 8, top: 8, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%"   stopColor="#38bdf8" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#38bdf8" stopOpacity={0}   />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="time" tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'var(--chart-tooltip-bg)',
+                      border: '1px solid var(--chart-tooltip-border)',
+                      color: 'var(--chart-tooltip-text)',
+                      borderRadius: '10px',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Area type="monotone" dataKey="value" stroke="#38bdf8" strokeWidth={2} fill="url(#fillGrad)" dot={false} />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
 
+        {/* Right: summary + location */}
         <div className="space-y-5">
-          <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
-            <h4 className="text-xl font-semibold text-white">Telemetry Summary</h4>
-            <div className="mt-5 grid gap-4">
-              <div className="rounded-3xl bg-slate-950/70 p-5">
-                <p className="text-sm text-slate-400">Humidity</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{bin.humidity}%</p>
-              </div>
-              <div className="rounded-3xl bg-slate-950/70 p-5">
-                <p className="text-sm text-slate-400">Gas Level</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{bin.gasLevel}</p>
-              </div>
-              <div className="rounded-3xl bg-slate-950/70 p-5">
-                <p className="text-sm text-slate-400">Current Status</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{bin.status}</p>
-              </div>
-              <div className="rounded-3xl bg-slate-950/70 p-5">
-                <p className="text-sm text-slate-400">Last Updated</p>
-                <p className="mt-2 text-3xl font-semibold text-white">{bin.lastUpdated}</p>
-              </div>
+          <div className="glass-panel shadow-card rounded-2xl p-5">
+            <h2 className="mb-4 text-sm font-semibold text-white">Telemetry Summary</h2>
+            <div className="space-y-2">
+              {[
+                { label: 'Humidity',     value: `${bin.humidity}%`   },
+                { label: 'Gas Level',    value: String(bin.gasLevel)  },
+                { label: 'Status',       value: bin.status            },
+                { label: 'Last Updated', value: bin.lastUpdated       },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center justify-between rounded-lg border border-white/[0.05] bg-white/[0.02] px-4 py-3">
+                  <span className="text-xs text-slate-500">{label}</span>
+                  <span className="text-sm font-semibold text-white">{value}</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
-            <h4 className="text-xl font-semibold text-white">Location</h4>
-            <p className="mt-3 text-slate-400">{bin.location} — monitored continuously with live sensor telemetry.</p>
-            <div className="mt-6 rounded-3xl bg-slate-950/70 p-5 text-slate-300">
-              <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Coordinates</p>
-              <p className="mt-3 text-lg text-white">
-                Latitude: {bin.latitude !== undefined ? bin.latitude : '--'}, Longitude: {bin.longitude !== undefined ? bin.longitude : '--'}
+          <div className="glass-panel shadow-card rounded-2xl p-5">
+            <div className="flex items-center gap-2 text-slate-400">
+              <MapPin size={15} />
+              <h2 className="text-sm font-semibold text-white">Location</h2>
+            </div>
+            <p className="mt-3 text-sm text-slate-400">{bin.location}</p>
+            <p className="mt-1 text-xs text-slate-600">Monitored continuously with live sensor telemetry.</p>
+            <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Coordinates</p>
+              <p className="mt-2 font-mono text-sm text-white">
+                {bin.latitude  !== undefined ? bin.latitude.toFixed(6)  : '—'},&nbsp;
+                {bin.longitude !== undefined ? bin.longitude.toFixed(6) : '—'}
               </p>
-              {bin.latitude === undefined || bin.longitude === undefined ? (
-                <p className="mt-2 text-sm text-slate-400">Live coordinates are not available for this bin yet.</p>
-              ) : null}
+              {(bin.latitude === undefined || bin.longitude === undefined) && (
+                <p className="mt-1.5 text-xs text-slate-600">Live coordinates not yet available for this bin.</p>
+              )}
             </div>
           </div>
         </div>

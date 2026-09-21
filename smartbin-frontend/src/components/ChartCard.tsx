@@ -8,12 +8,10 @@ interface ChartCardProps {
 
 export default function ChartCard({ title, helpText, children }: ChartCardProps) {
   return (
-    <div className="glass-panel rounded-[28px] border border-white/10 p-5 shadow-panel">
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
-          <p className="text-sm text-slate-400">{helpText}</p>
-        </div>
+    <div className="glass-panel shadow-card rounded-2xl p-5">
+      <div className="mb-5">
+        <h3 className="text-base font-semibold text-white">{title}</h3>
+        <p className="mt-0.5 text-xs text-slate-500">{helpText}</p>
       </div>
       <div className="h-72">{children}</div>
     </div>

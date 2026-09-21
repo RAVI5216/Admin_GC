@@ -1,63 +1,47 @@
 # SmartBin Backend
 
-Production-ready backend for the SmartBin IoT garbage monitoring system.
+The website backend is the Socket.IO relay between the dedicated EC2 SmartBin service and the React dashboard. It owns the website REST API, MongoDB, authentication, profiles, employers, notifications, and browser-facing Socket.IO server.
 
-## Features
+## Architecture
 
-- Secure MQTT connection to AWS IoT Core using TLS certificates
-- Subscribes to `smartbin/data`
-- Parses JSON payloads
-- Validates incoming sensor data
-- Broadcasts valid messages to React clients via Socket.IO
-- Automatic reconnect handling for AWS IoT MQTT
-- Graceful error handling and status reporting
-- CORS-enabled Socket.IO configuration
+```text
+ESP32 -> MQTT -> AWS IoT Core -> MQTT -> EC2 SmartBin IoT Service
+      -> Socket.IO (smartbin-data) -> Website Backend
+      -> Socket.IO (smartbin-data) -> React Frontend
+```
 
-## Project Structure
-
-- `server.js` - application entrypoint
-- `config/awsConfig.js` - environment variable loading and TLS path resolution
-- `mqtt/mqttService.js` - AWS IoT Core MQTT connection, subscription, and payload handling
-- `socket/socket.js` - Socket.IO setup and broadcast helper
-- `routes/health.js` - health check route
-- `utils/logger.js` - simple structured logger
+AWS IoT/MQTT is handled only by the EC2 SmartBin IoT Service. This backend does not connect to AWS IoT or subscribe to MQTT, and the React frontend never connects to AWS IoT or EC2 directly.
 
 ## Environment
 
-Create a `.env` file with these values:
+Create `smartbin-backend/.env` (it is ignored by Git):
 
 ```env
 PORT=5000
-AWS_IOT_ENDPOINT=az1cjg059aaqf-ats.iot.ap-southeast-2.amazonaws.com
-CLIENT_ID=SmartBinBackend
-MQTT_TOPIC=smartbin/data
-MQTT_CERT_PATH=certs/device-certificate.pem.crt
-MQTT_PRIVATE_KEY_PATH=certs/private.pem.key
-MQTT_CA_PATH=certs/AmazonRootCA1.pem
+MONGODB_URI=<your MongoDB URI>
+SMARTBIN_IOT_SERVICE_URL=http://54.206.16.121
 ```
 
-## API
+The frontend's `smartbin-frontend/.env.local` is also ignored by Git and should contain:
 
-- `GET /` returns `SmartBin Backend Running`
-- `GET /health` returns `{ "status": "OK", "mqtt": "Connected" }`
+```env
+VITE_API_URL=http://localhost:5000
+```
+
+## SmartBin data flow
+
+`SmartBinIoTService` connects to `SMARTBIN_IOT_SERVICE_URL` through Socket.IO at `/socket.io`. It validates each incoming `smartbin-data` event and broadcasts the validated event to website clients using the same event name. The client automatically reconnects when EC2 is temporarily unavailable; the Express server continues serving REST requests.
+
+Expected sensor fields are `deviceId`, `fillPercentage`, `distance`, `uptime`, `status`, `online`, and `lastUpdated`.
+
+Sensor events are not automatically stored as historical MongoDB records on every message. Historical IoT storage is a separate future feature. Existing alert-notification behavior remains independent of raw sensor-event storage.
 
 ## Run
-
-Install dependencies:
 
 ```bash
 cd smartbin-backend
 npm install
-```
-
-Start server:
-
-```bash
 npm start
 ```
 
-## Notes
-
-- Do not hardcode AWS values; use `.env`
-- The service is ready for future persistence layers such as DynamoDB
-- Sensor data is emitted via `io.emit('smartbin-data', data)`
+The backend listens on port 5000 by default. Useful endpoints include `GET /`, `GET /health`, `GET /profile`, `GET /notifications`, `POST /auth/login`, and `GET /employers`.

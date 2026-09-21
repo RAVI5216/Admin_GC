@@ -1,4 +1,4 @@
-export type BinStatus = 'online' | 'offline' | 'full' | 'warning' | 'normal';
+export type BinStatus = 'online' | 'offline' | 'full' | 'warning' | 'normal' | 'Almost Full';
 
 export interface SmartBinData {
   deviceId: string;
@@ -13,6 +13,10 @@ export interface SmartBinData {
   rssi: number;
   status: BinStatus;
   lastUpdated: string;
+  // EC2 IoT Service fields
+  distance?: number;
+  uptime?: number;
+  online?: boolean;
 }
 
 export interface SmartBinPayload {

@@ -5,7 +5,7 @@ export const createHealthRouter = (statusProvider) => {
 
   router.get('/', (req, res) => {
     const status = statusProvider();
-    res.json({ status: 'OK', mqtt: status.mqtt });
+    res.json({ status: 'OK', iot: status.iot });
   });
 
   return router;

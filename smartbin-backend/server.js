@@ -1,7 +1,7 @@
 import http from 'http';
 import express from 'express';
 import cors from 'cors';
-import { serverConfig } from './config/awsConfig.js';
+import { serverConfig } from './config/serverConfig.js';
 import { dbConfig } from './config/dbConfig.js';
 import { connectMongo, getDb } from './db/mongo.js';
 import { createHealthRouter } from './routes/health.js';
@@ -10,7 +10,7 @@ import { createNotificationsRouter } from './routes/notifications.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createEmployerRouter } from './routes/employers.js';
 import { initializeSocket } from './socket/socket.js';
-import { MqttService } from './mqtt/mqttService.js';
+import { SmartBinIoTService } from './iot/smartbinService.js';
 import { logger } from './utils/logger.js';
 
 const app = express();
@@ -25,18 +25,27 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-let mqttStatus = { mqtt: 'Disconnected' };
+let iotStatus = { iot: 'Disconnected' };
 
 const saveAlertNotification = async (payload) => {
   try {
     const db = getDb();
-    const { deviceId, location, status: rawStatus, fillLevel, timestamp } = payload;
+    const { deviceId, location, status: rawStatus, fillLevel, fillPercentage, timestamp, lastUpdated } = payload;
+    const effectiveFillLevel =
+      typeof fillLevel === 'number'
+        ? fillLevel
+        : typeof fillPercentage === 'number'
+        ? fillPercentage
+        : undefined;
+    const normalizedStatus = typeof rawStatus === 'string' ? rawStatus.trim().toLowerCase() : '';
     const effectiveStatus =
-      typeof rawStatus === 'string' && rawStatus
-        ? rawStatus
-        : typeof fillLevel === 'number' && fillLevel >= 90
+      normalizedStatus === 'almost full'
+        ? 'warning'
+        : normalizedStatus === 'full' || normalizedStatus === 'warning' || normalizedStatus === 'offline'
+        ? normalizedStatus
+        : typeof effectiveFillLevel === 'number' && effectiveFillLevel >= 90
         ? 'full'
-        : typeof fillLevel === 'number' && fillLevel >= 70
+        : typeof effectiveFillLevel === 'number' && effectiveFillLevel >= 70
         ? 'warning'
         : 'online';
     const shouldAlert = effectiveStatus === 'full' || effectiveStatus === 'warning' || effectiveStatus === 'offline';
@@ -55,7 +64,7 @@ const saveAlertNotification = async (payload) => {
         ? `${location ?? deviceId} is full and requires service.`
         : effectiveStatus === 'offline'
         ? `${location ?? deviceId} is offline and needs attention.`
-        : `${location ?? deviceId} is ${fillLevel}% full and approaching capacity.`;
+        : `${location ?? deviceId} is ${effectiveFillLevel ?? 'unknown'}% full and approaching capacity.`;
 
     await db.collection('notifications').insertOne({
       title,
@@ -63,7 +72,7 @@ const saveAlertNotification = async (payload) => {
       severity: effectiveStatus === 'offline' ? 'critical' : 'warning',
       solved: false,
       problemSolved: false,
-      time: timestamp ?? new Date().toISOString(),
+      time: timestamp ?? lastUpdated ?? new Date().toISOString(),
       deviceId: deviceId ?? null,
       location: location ?? null,
       createdAt: new Date().toISOString(),
@@ -74,7 +83,7 @@ const saveAlertNotification = async (payload) => {
   }
 };
 
-const getStatus = () => mqttStatus;
+const getStatus = () => iotStatus;
 const healthRouter = createHealthRouter(getStatus);
 const profileRouter = createProfileRouter();
 const notificationsRouter = createNotificationsRouter();
@@ -114,15 +123,16 @@ app.use('/notifications', notificationsRouter);
 app.use('/auth', authRouter);
 app.use('/employers', employerRouter);
 
-const { io, broadcastSmartbinData } = initializeSocket(httpServer, corsOptions);
+const { broadcastSmartbinData } = initializeSocket(httpServer, corsOptions, logger);
 
-const mqttService = new MqttService({
-  onMessage: async (payload) => {
+const iotService = new SmartBinIoTService({
+  iotServiceUrl: process.env.SMARTBIN_IOT_SERVICE_URL,
+  onData: async (payload) => {
     broadcastSmartbinData(payload);
     await saveAlertNotification(payload);
   },
   onStatusChange: (status) => {
-    mqttStatus = status;
+    iotStatus = status;
   },
   logger,
 });
@@ -149,9 +159,9 @@ const startServer = async () => {
   }
 
   try {
-    await mqttService.initialize();
+    await iotService.initialize();
   } catch (error) {
-    logger.warn('MQTT initialization could not be completed; continuing with HTTP server startup', error instanceof Error ? error.message : String(error));
+    logger.warn('EC2 SmartBin IoT service initialization could not be completed; continuing with HTTP server startup', error instanceof Error ? error.message : String(error));
   }
 
   httpServer.once('error', (error) => {
@@ -169,12 +179,12 @@ const startServer = async () => {
 };
 
 const shutdown = async () => {
-  logger.info('Shutdown requested. Closing server and MQTT connection.');
+  logger.info('Shutdown requested. Closing server and EC2 IoT connection.');
   httpServer.close(async (err) => {
     if (err) {
       logger.error('HTTP server shutdown error', err.message);
     }
-    await mqttService.disconnect();
+    await iotService.disconnect();
     process.exit(0);
   });
 };
