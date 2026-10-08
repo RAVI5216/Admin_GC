@@ -1,128 +1,199 @@
 import express from 'express';
-import { ObjectId } from 'mongodb';
-import { getDb } from '../db/mongo.js';
+import bcrypt from 'bcrypt';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { logger } from '../utils/logger.js';
 
-const employerRoles = [
-  'Waste Collector',
-  'Sanitation Worker',
-  'Waste Segregation Worker',
-  'Recycling Plant Operator',
-  'Driver',
-  'Waste Management Technician',
-  'Environmental Technician',
-];
+const USERS_TABLE_NAME = 'GarbageGuardianUsers';
+const defaultDynamoDb = DynamoDBDocumentClient.from(
+  new DynamoDBClient({ region: process.env.AWS_REGION || 'ap-southeast-2' })
+);
+let lastGeneratedEmployerId = 0;
 
-const employerStatuses = ['available', 'assigned', 'off-duty'];
-
-const normalizeEmployer = (body) => {
-  const name = typeof body.name === 'string' ? body.name.trim() : '';
-  const role = typeof body.role === 'string' && employerRoles.includes(body.role) ? body.role : 'Waste Collector';
-  const email = typeof body.email === 'string' ? body.email.trim() : '';
-  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
-  const location = typeof body.location === 'string' ? body.location.trim() : '';
-  const status = typeof body.status === 'string' && employerStatuses.includes(body.status) ? body.status : 'available';
-  const notes = typeof body.notes === 'string' ? body.notes.trim() : '';
-  const lastActive = typeof body.lastActive === 'string' ? body.lastActive : new Date().toISOString();
-
-  return { name, role, email, phone, location, status, notes, lastActive };
+const generateTimestampId = () => {
+  const timestamp = Date.now();
+  lastGeneratedEmployerId = Math.max(timestamp, lastGeneratedEmployerId + 1);
+  return String(lastGeneratedEmployerId);
 };
 
-const ensureEmployerId = (id) => {
-  try {
-    return new ObjectId(id);
-  } catch {
-    return null;
+const hasEmployerIdPrefix = (value) =>
+  typeof value === 'string' && value.trim().toUpperCase().startsWith('EMP-');
+
+export const isEmployerRecord = (user) =>
+  Boolean(user) &&
+  (hasEmployerIdPrefix(user.employeeId) ||
+    (typeof user.role === 'string' && user.role.trim().toLowerCase() === 'employee') ||
+    hasEmployerIdPrefix(user.userId));
+
+const toUserResponse = (user) => {
+  const safeAttributes = Object.fromEntries(
+    Object.entries(user).filter(([key]) => !/(password|secret|token|credential|otp|resetcode)/i.test(key))
+  );
+  const userId = typeof user.userId === 'string' ? user.userId.trim() : '';
+
+  return {
+    ...safeAttributes,
+    ...(userId
+      ? { employerId: hasEmployerIdPrefix(userId) ? userId : `EMP-${userId}` }
+      : {}),
+  };
+};
+
+const normalizeId = (value) => value.trim().toUpperCase();
+
+const scanExistingIds = async (dynamoDb) => {
+  const existingIds = new Set();
+  let lastEvaluatedKey;
+
+  do {
+    const result = await dynamoDb.send(
+      new ScanCommand({
+        TableName: USERS_TABLE_NAME,
+        ProjectionExpression: '#userId, #employeeId',
+        ExpressionAttributeNames: {
+          '#userId': 'userId',
+          '#employeeId': 'employeeId',
+        },
+        ConsistentRead: true,
+        ...(lastEvaluatedKey ? { ExclusiveStartKey: lastEvaluatedKey } : {}),
+      })
+    );
+
+    for (const user of result.Items ?? []) {
+      if (typeof user.userId === 'string') existingIds.add(normalizeId(user.userId));
+      if (typeof user.employeeId === 'string') existingIds.add(normalizeId(user.employeeId));
+    }
+    lastEvaluatedKey = result.LastEvaluatedKey;
+  } while (lastEvaluatedKey);
+
+  return existingIds;
+};
+
+const generateUniqueIds = async (dynamoDb, generateId) => {
+  const existingIds = await scanExistingIds(dynamoDb);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const userId = `EMP-${generateId()}`;
+    const employeeId = `EMP-${generateId()}`;
+    if (
+      !existingIds.has(normalizeId(userId)) &&
+      !existingIds.has(normalizeId(employeeId)) &&
+      normalizeId(userId) !== normalizeId(employeeId)
+    ) {
+      return { userId, employeeId };
+    }
   }
+  throw new Error('Unable to generate unique employer IDs');
 };
 
-const mapEmployer = (item) => ({
-  ...item,
-  _id: item._id.toString(),
-});
-
-export const createEmployerRouter = () => {
+export const createEmployerRouter = ({
+  dynamoDb = defaultDynamoDb,
+  hashPassword = (password) => bcrypt.hash(password, 10),
+  generateId = generateTimestampId,
+  now = () => new Date(),
+} = {}) => {
   const router = express.Router();
 
   router.get('/', async (req, res) => {
     try {
-      const db = getDb();
-      const collection = db.collection('employers');
-      const employers = await collection
-        .find()
-        .sort({ status: 1, name: 1 })
-        .toArray();
-      res.json(employers.map(mapEmployer));
+      const users = [];
+      let lastEvaluatedKey;
+
+      do {
+        const result = await dynamoDb.send(
+          new ScanCommand({
+            TableName: USERS_TABLE_NAME,
+            ...(lastEvaluatedKey ? { ExclusiveStartKey: lastEvaluatedKey } : {}),
+          })
+        );
+        users.push(...(result.Items ?? []));
+        lastEvaluatedKey = result.LastEvaluatedKey;
+      } while (lastEvaluatedKey);
+
+      res.json(users.filter(isEmployerRecord).map(toUserResponse));
     } catch (error) {
-      res.status(500).json({ error: 'Unable to load employer records' });
+      logger.error('Unable to load employer users from DynamoDB', error instanceof Error ? error.message : String(error));
+      res.status(500).json({ error: 'Unable to load employer users' });
+    }
+  });
+
+  router.post('/ids', async (req, res) => {
+    try {
+      return res.json(await generateUniqueIds(dynamoDb, generateId));
+    } catch (error) {
+      logger.error(
+        'Unable to generate unique employer IDs',
+        error instanceof Error ? error.message : String(error)
+      );
+      return res.status(500).json({ error: 'Unable to generate unique employer IDs' });
     }
   });
 
   router.post('/', async (req, res) => {
-    const employer = normalizeEmployer(req.body);
-    if (!employer.name || !employer.email || !employer.phone) {
-      return res.status(400).json({ error: 'Name, email, and phone are required' });
-    }
+    const userId = typeof req.body?.userId === 'string' ? req.body.userId.trim() : '';
+    const employeeId = typeof req.body?.employeeId === 'string' ? req.body.employeeId.trim() : '';
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+    const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+    const department = typeof req.body?.department === 'string' ? req.body.department.trim() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
 
-    try {
-      const db = getDb();
-      const collection = db.collection('employers');
-      const result = await collection.insertOne({
-        ...employer,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+    if (!userId || !employeeId || !name || !email || !password) {
+      return res.status(400).json({
+        error: 'userId, employeeId, name, email, and password are required',
       });
-      res.status(201).json(mapEmployer({ _id: result.insertedId, ...employer }));
-    } catch (error) {
-      res.status(500).json({ error: 'Unable to create employer record' });
     }
-  });
-
-  router.put('/:id', async (req, res) => {
-    const id = ensureEmployerId(req.params.id);
-    if (!id) {
-      return res.status(400).json({ error: 'Invalid employer ID' });
+    if (!hasEmployerIdPrefix(userId) || !hasEmployerIdPrefix(employeeId)) {
+      return res.status(400).json({ error: 'Employer IDs must start with EMP-' });
     }
-
-    const employer = normalizeEmployer(req.body);
-    if (!employer.name || !employer.email || !employer.phone) {
-      return res.status(400).json({ error: 'Name, email, and phone are required' });
+    if (normalizeId(userId) === normalizeId(employeeId)) {
+      return res.status(400).json({ error: 'User ID and Employee ID must be different' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'A valid email address is required' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
     try {
-      const db = getDb();
-      const collection = db.collection('employers');
-      const update = {
-        $set: {
-          ...employer,
-          updatedAt: new Date().toISOString(),
-        },
+      const existingIds = await scanExistingIds(dynamoDb);
+      if (existingIds.has(normalizeId(userId)) || existingIds.has(normalizeId(employeeId))) {
+        return res.status(409).json({
+          error: 'A generated ID is already in use. Generate new IDs and try again.',
+        });
+      }
+
+      const passwordHash = await hashPassword(password);
+      const employer = {
+        userId,
+        employeeId,
+        name,
+        email,
+        role: 'employee',
+        createdAt: now().toISOString(),
+        passwordHash,
+        ...(phone ? { phone } : {}),
+        ...(department ? { department } : {}),
       };
-      const result = await collection.findOneAndUpdate({ _id: id }, update, { returnDocument: 'after' });
-      if (!result.value) {
-        return res.status(404).json({ error: 'Employer record not found' });
-      }
-      res.json(mapEmployer(result.value));
-    } catch (error) {
-      res.status(500).json({ error: 'Unable to update employer record' });
-    }
-  });
 
-  router.delete('/:id', async (req, res) => {
-    const id = ensureEmployerId(req.params.id);
-    if (!id) {
-      return res.status(400).json({ error: 'Invalid employer ID' });
-    }
+      await dynamoDb.send(
+        new PutCommand({
+          TableName: USERS_TABLE_NAME,
+          Item: employer,
+          ConditionExpression: 'attribute_not_exists(userId)',
+        })
+      );
 
-    try {
-      const db = getDb();
-      const collection = db.collection('employers');
-      const result = await collection.deleteOne({ _id: id });
-      if (result.deletedCount === 0) {
-        return res.status(404).json({ error: 'Employer record not found' });
-      }
-      res.status(204).end();
+      return res.status(201).json(toUserResponse(employer));
     } catch (error) {
-      res.status(500).json({ error: 'Unable to delete employer record' });
+      if (error?.name === 'ConditionalCheckFailedException') {
+        return res.status(409).json({ error: 'A user with this userId already exists' });
+      }
+      logger.error(
+        'Unable to create employer user in DynamoDB',
+        error instanceof Error ? error.message : String(error)
+      );
+      return res.status(500).json({ error: 'Unable to create employer user' });
     }
   });
 

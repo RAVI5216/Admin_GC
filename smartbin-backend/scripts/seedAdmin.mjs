@@ -1,51 +1,40 @@
 import bcrypt from 'bcrypt';
-import { MongoClient } from 'mongodb';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-dotenv.config({
-  path: path.resolve(__dirname, '../.env'),
-});
-
-const uri = process.env.MONGODB_URI;
-
-if (!uri) {
-  throw new Error('MONGODB_URI is required');
+const email = process.env.ADMIN_EMAIL?.trim();
+const name = process.env.ADMIN_NAME?.trim();
+const password = process.env.ADMIN_PASSWORD;
+if (!email || !name || !password) {
+  throw new Error('ADMIN_EMAIL, ADMIN_NAME, and ADMIN_PASSWORD are required to seed an admin');
 }
 
-const client = new MongoClient(uri);
+const dynamoDb = DynamoDBDocumentClient.from(
+  new DynamoDBClient({ region: process.env.AWS_REGION || 'ap-southeast-2' })
+);
 
-async function run() {
-  try {
-    await client.connect();
-
-    const db = client.db();
-
-    const passwordHash = await bcrypt.hash('Megha123', 10);
-
-    await db.collection('adminUsers').updateOne(
-      { email: 'Megha123@gmail.com' },
-      {
-        $set: {
-          email: 'Megha123@gmail.com',
-          name: 'Megha Mudholkar',
-          passwordHash,
-        },
+try {
+  const passwordHash = await bcrypt.hash(password, 10);
+  await dynamoDb.send(
+    new PutCommand({
+      TableName: 'GarbageGuardianDashAdmin',
+      Item: {
+        email,
+        recordType: 'admin',
+        name,
+        passwordHash,
       },
-      { upsert: true }
-    );
-
-    console.log('Admin user seeded: Megha123@gmail.com / Megha123');
-  } finally {
-    await client.close();
-  }
+      ConditionExpression: 'attribute_not_exists(email)',
+    })
+  );
+  console.log('Admin account created in GarbageGuardianDashAdmin.');
+} finally {
+  dynamoDb.destroy();
 }
-
-run().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});

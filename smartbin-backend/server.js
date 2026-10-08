@@ -1,15 +1,17 @@
 import http from 'http';
 import express from 'express';
 import cors from 'cors';
+import { randomUUID } from 'crypto';
 import { serverConfig } from './config/serverConfig.js';
-import { dbConfig } from './config/dbConfig.js';
-import { connectMongo, getDb } from './db/mongo.js';
+import { PutCommand } from '@aws-sdk/lib-dynamodb';
+import { DASH_ADMIN_TABLE_NAME, dashboardDynamoDb } from './db/dynamo.js';
 import { createHealthRouter } from './routes/health.js';
 import { createProfileRouter } from './routes/profile.js';
 import { createNotificationsRouter } from './routes/notifications.js';
 import { createReportsRouter } from './routes/reports.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createEmployerRouter } from './routes/employers.js';
+import { createTasksRouter } from './routes/tasks.js';
 import { initializeSocket } from './socket/socket.js';
 import { SmartBinIoTService } from './iot/smartbinService.js';
 import { logger } from './utils/logger.js';
@@ -30,7 +32,6 @@ let iotStatus = { iot: 'Disconnected' };
 
 const saveAlertNotification = async (payload) => {
   try {
-    const db = getDb();
     const { deviceId, location, status: rawStatus, fillLevel, fillPercentage, timestamp, lastUpdated } = payload;
     const effectiveFillLevel =
       typeof fillLevel === 'number'
@@ -67,18 +68,28 @@ const saveAlertNotification = async (payload) => {
         ? `${location ?? deviceId} is offline and needs attention.`
         : `${location ?? deviceId} is ${effectiveFillLevel ?? 'unknown'}% full and approaching capacity.`;
 
-    await db.collection('notifications').insertOne({
-      title,
-      message,
-      severity: effectiveStatus === 'offline' ? 'critical' : 'warning',
-      solved: false,
-      problemSolved: false,
-      time: timestamp ?? lastUpdated ?? new Date().toISOString(),
-      deviceId: deviceId ?? null,
-      location: location ?? null,
-      createdAt: new Date().toISOString(),
-      updatedAt: null,
-    });
+    const notificationId = randomUUID();
+    await dashboardDynamoDb.send(
+      new PutCommand({
+      TableName: DASH_ADMIN_TABLE_NAME,
+      Item: {
+        email: `NOTIFICATION#${notificationId}`,
+        notificationId,
+        recordType: 'notification',
+        title,
+        message,
+        severity: effectiveStatus === 'offline' ? 'critical' : 'warning',
+        solved: false,
+        problemSolved: false,
+        time: timestamp ?? lastUpdated ?? new Date().toISOString(),
+        deviceId: deviceId ?? null,
+        location: location ?? null,
+        createdAt: new Date().toISOString(),
+        updatedAt: null,
+      },
+      ConditionExpression: 'attribute_not_exists(email)',
+      })
+    );
   } catch (error) {
     logger.error('Unable to persist alert notification', error instanceof Error ? error.message : String(error));
   }
@@ -91,6 +102,7 @@ const notificationsRouter = createNotificationsRouter();
 const reportsRouter = createReportsRouter();
 const authRouter = createAuthRouter();
 const employerRouter = createEmployerRouter();
+const tasksRouter = createTasksRouter();
 
 app.get('/', (req, res) => {
   res.send('SmartBin Backend Running');
@@ -124,7 +136,8 @@ app.get("/test", (req, res) => {
 app.use('/notifications', notificationsRouter);
 app.use('/reports', reportsRouter);
 app.use('/auth', authRouter);
-app.use('/employers', employerRouter);
+app.use('/api/employers', employerRouter);
+app.use('/api/tasks', tasksRouter);
 
 const { broadcastSmartbinData } = initializeSocket(httpServer, corsOptions, logger);
 
@@ -141,26 +154,6 @@ const iotService = new SmartBinIoTService({
 });
 
 const startServer = async () => {
-  try {
-    await connectMongo(dbConfig.uri);
-    logger.info('Connected to MongoDB');
-
-    try {
-      const db = getDb();
-      await db.createCollection('notifications');
-      logger.info('Ensured notifications collection exists');
-    } catch (createError) {
-      if (createError.codeName === 'NamespaceExists' || createError.message.includes('already exists')) {
-        logger.info('Notifications collection already exists');
-      } else {
-        logger.warn('Unable to create notifications collection', createError instanceof Error ? createError.message : String(createError));
-      }
-    }
-  } catch (error) {
-    logger.error('MongoDB connection failed', error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
-
   try {
     await iotService.initialize();
   } catch (error) {
@@ -188,6 +181,7 @@ const shutdown = async () => {
       logger.error('HTTP server shutdown error', err.message);
     }
     await iotService.disconnect();
+    dashboardDynamoDb.destroy();
     process.exit(0);
   });
 };

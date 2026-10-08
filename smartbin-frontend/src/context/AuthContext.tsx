@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 const API_BASE = 'http://localhost:5000';
 
@@ -11,7 +11,7 @@ const readApiResponse = async (response: Response, fallback: string) => {
   } catch {
     if (responseText.trimStart().startsWith('<')) {
       throw new Error(
-        'The backend returned an HTML page instead of an API response. Restart the backend so it loads the password reset routes.'
+        'The backend returned an HTML page instead of an API response. Restart the backend so it loads the authentication routes.'
       );
     }
     throw new Error('The backend returned an invalid response. Check that the backend API is running.');
@@ -29,12 +29,18 @@ type User = {
   email: string;
 };
 
+type LoginChallenge = {
+  email: string;
+  message: string;
+};
+
 type AuthContextType = {
   user: User | null;
   loading: boolean;
   savedEmail: string | null;
   savedPassword: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginChallenge>;
+  verifyLoginOtp: (email: string, code: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<string>;
   resetPassword: (email: string, code: string, password: string) => Promise<string>;
   logout: () => void;
@@ -50,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [savedEmail, setSavedEmail] = useState<string | null>(null);
   const [savedPassword, setSavedPassword] = useState<string | null>(null);
+  const pendingPassword = useRef<string | null>(null);
 
   const login = async (email: string, password: string) => {
     setLoading(true);
@@ -60,15 +67,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
       const data = await readApiResponse(res, 'Login failed');
-      if (typeof data.email !== 'string' || typeof data.name !== 'string') {
+      if (data.otpRequired !== true || typeof data.email !== 'string' || typeof data.message !== 'string') {
         throw new Error('The backend returned an invalid login response.');
       }
-      setUser({ name: data.name, email: data.email });
+      pendingPassword.current = password;
+      return { email: data.email, message: data.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyLoginOtp = async (email: string, code: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/verify-login-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      });
+      const data = await readApiResponse(res, 'Login verification failed');
+      if (typeof data.email !== 'string' || typeof data.name !== 'string') {
+        throw new Error('The backend returned an invalid login verification response.');
+      }
+      const user = { name: data.name, email: data.email };
+      setUser(user);
       setSavedEmail(data.email);
-      setSavedPassword(password);
-      localStorage.setItem('adminUser', JSON.stringify({ name: data.name, email: data.email }));
+      localStorage.setItem('adminUser', JSON.stringify(user));
       localStorage.setItem('adminEmail', data.email);
-      localStorage.setItem('adminPassword', password);
+      if (pendingPassword.current) {
+        setSavedPassword(pendingPassword.current);
+        localStorage.setItem('adminPassword', pendingPassword.current);
+      }
+      pendingPassword.current = null;
     } finally {
       setLoading(false);
     }
@@ -98,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('The backend returned an invalid password reset response.');
     }
     setSavedPassword(null);
+    pendingPassword.current = null;
     localStorage.removeItem('adminPassword');
     return data.message;
   };
@@ -106,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setSavedEmail(null);
     setSavedPassword(null);
+    pendingPassword.current = null;
     localStorage.removeItem('adminUser');
     localStorage.removeItem('adminEmail');
     localStorage.removeItem('adminPassword');
@@ -151,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         savedEmail,
         savedPassword,
         login,
+        verifyLoginOtp,
         requestPasswordReset,
         resetPassword,
         logout,

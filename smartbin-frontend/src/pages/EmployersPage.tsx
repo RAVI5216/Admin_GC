@@ -1,194 +1,311 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, CheckCircle2, CircleDashed, Edit3, Plus, Trash2, Users } from 'lucide-react';
-import { createEmployer, deleteEmployer, fetchEmployers, updateEmployer } from '../services/employerService';
-import type { Employer, EmployerRequest } from '../types/employer';
-import { employerRoles, employerStatusOptions } from '../types/employer';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { AlertCircle, CheckCircle2, LoaderCircle, Plus, RefreshCw, Users, X } from 'lucide-react';
+import {
+  createEmployer,
+  createEmployerTask,
+  fetchEmployers,
+  generateEmployerIds,
+} from '../services/employerService';
+import { fetchReports, type ReportRecord, unassignReport } from '../services/reportService';
+import type { EmployerUser } from '../types/employer';
 
-const defaultForm: EmployerRequest = {
-  name: '',
-  role: employerRoles[0],
-  email: '',
-  phone: '',
-  location: '',
-  status: 'available',
-  notes: '',
+const formatValue = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
 };
 
-const statusLabel = (status: Employer['status']) => {
-  switch (status) {
-    case 'available':
-      return 'Available';
-    case 'assigned':
-      return 'Assigned';
-    case 'off-duty':
-      return 'Off Duty';
-    default:
-      return status;
-  }
+const formatLabel = (key: string) =>
+  key === 'employerId'
+    ? 'Employer ID (from userId)'
+    : key === 'employeeId'
+      ? 'Employee ID (stored)'
+      : key
+          .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+          .replace(/^./, (character) => character.toUpperCase());
+
+const reportFieldAliases: Record<string, string[]> = {
+  reportId: ['reportId', 'reportID'],
+  location: ['location'],
+  createdAt: ['createdAt'],
+  binId: ['binId', 'deviceId'],
+  issueType: ['issueType', 'issue', 'category'],
+  status: ['status'],
 };
 
-const statusClasses = (status: Employer['status']) => {
-  switch (status) {
-    case 'available':
-      return 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20';
-    case 'assigned':
-      return 'bg-amber-500/10 text-amber-300 ring-1 ring-amber-500/20';
-    case 'off-duty':
-      return 'bg-slate-700/60 text-slate-200 ring-1 ring-slate-500/20';
-    default:
-      return 'bg-slate-700/60 text-slate-200 ring-1 ring-slate-500/20';
-  }
+const getReportField = (report: ReportRecord, field: string) => {
+  const aliases = reportFieldAliases[field] ?? [field];
+  const normalizedAliases = aliases.map((alias) => alias.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const entry = Object.entries(report).find(([key]) =>
+    normalizedAliases.includes(key.toLowerCase().replace(/[^a-z0-9]/g, ''))
+  );
+  return entry?.[1];
+};
+
+const isReportAssigned = (report: ReportRecord) =>
+  typeof getReportField(report, 'status') === 'string' &&
+  String(getReportField(report, 'status')).trim().toLowerCase() === 'assigned';
+
+const withReportStatus = (report: ReportRecord, status: string): ReportRecord => {
+  const statusKey =
+    Object.keys(report).find(
+      (key) => key.toLowerCase().replace(/[^a-z0-9]/g, '') === 'status'
+    ) ?? 'status';
+  return { ...report, [statusKey]: status };
 };
 
 function EmployersPage() {
-  const [employers, setEmployers] = useState<Employer[]>([]);
+  const [employers, setEmployers] = useState<EmployerUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [formState, setFormState] = useState<EmployerRequest>(defaultForm);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [assignmentEmployer, setAssignmentEmployer] = useState<EmployerUser | null>(null);
+  const [reports, setReports] = useState<ReportRecord[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  const [updatingReportId, setUpdatingReportId] = useState<string | null>(null);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [assignmentMessage, setAssignmentMessage] = useState<string | null>(null);
+  const [addFormOpen, setAddFormOpen] = useState(false);
+  const [savingEmployer, setSavingEmployer] = useState(false);
+  const [generatingEmployerIds, setGeneratingEmployerIds] = useState(false);
+  const [addEmployerError, setAddEmployerError] = useState<string | null>(null);
+  const [addEmployerMessage, setAddEmployerMessage] = useState<string | null>(null);
+  const [newEmployer, setNewEmployer] = useState({
+    userId: '',
+    employeeId: '',
+    name: '',
+    email: '',
+    phone: '',
+    department: '',
+    password: '',
+  });
 
-  const loadEmployers = async () => {
-    setLoading(true);
+  const refreshGeneratedEmployerIds = async () => {
+    setGeneratingEmployerIds(true);
+    setAddEmployerError(null);
+    setNewEmployer((current) => ({ ...current, userId: '', employeeId: '' }));
     try {
-      const data = await fetchEmployers();
-      setEmployers(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const ids = await generateEmployerIds();
+      setNewEmployer((current) => ({ ...current, ...ids }));
+    } catch (generateError) {
+      setAddEmployerError(
+        generateError instanceof Error ? generateError.message : 'Unable to generate employer IDs'
+      );
     } finally {
-      setLoading(false);
+      setGeneratingEmployerIds(false);
     }
+  };
+
+  const openAddEmployerForm = () => {
+    setAddEmployerError(null);
+    setAddEmployerMessage(null);
+    setNewEmployer({
+      userId: '',
+      employeeId: '',
+      name: '',
+      email: '',
+      phone: '',
+      department: '',
+      password: '',
+    });
+    setAddFormOpen(true);
+    void refreshGeneratedEmployerIds();
   };
 
   useEffect(() => {
-    loadEmployers();
-  }, []);
+    let active = true;
 
-  const summary = useMemo(
-    () => ({
-      total: employers.length,
-      available: employers.filter((item) => item.status === 'available').length,
-      assigned: employers.filter((item) => item.status === 'assigned').length,
-      offDuty: employers.filter((item) => item.status === 'off-duty').length,
-    }),
+    const loadEmployers = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const users = await fetchEmployers();
+        if (active) setEmployers(users);
+      } catch (loadError) {
+        if (active) {
+          setError(loadError instanceof Error ? loadError.message : 'Unable to load employer users');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void loadEmployers();
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
+
+  useEffect(() => {
+    if (!assignmentEmployer) return undefined;
+
+    let active = true;
+    setReports([]);
+    setReportsLoading(true);
+    setReportsError(null);
+
+    const loadReports = async () => {
+      try {
+        const result = await fetchReports();
+        if (active) setReports(result);
+      } catch (loadError) {
+        if (active) {
+          setReportsError(loadError instanceof Error ? loadError.message : 'Unable to load reports');
+        }
+      } finally {
+        if (active) setReportsLoading(false);
+      }
+    };
+
+    void loadReports();
+    return () => {
+      active = false;
+    };
+  }, [assignmentEmployer]);
+
+  const columns = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          'employerId',
+          'name',
+          'employeeId',
+          ...employers.flatMap((employer) => Object.keys(employer)),
+        ])
+      ),
     [employers]
   );
 
-  const resetForm = () => {
-    setEditingId(null);
-    setFormState(defaultForm);
-    setMessage(null);
-    setError(null);
+  const openAssignmentForm = (employer: EmployerUser) => {
+    setAssignmentEmployer(employer);
+    setAssignmentError(null);
+    setAssignmentMessage(null);
   };
 
-  const handleSave = async () => {
-    setError(null);
-    setMessage(null);
-    if (!formState.name.trim() || !formState.email.trim() || !formState.phone.trim()) {
-      setError('Name, email, and phone are required.');
+  const submitNewEmployer = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSavingEmployer(true);
+    setAddEmployerError(null);
+    setAddEmployerMessage(null);
+    try {
+      const created = await createEmployer(newEmployer);
+      setEmployers((currentEmployers) => [
+        ...currentEmployers.filter((employer) => employer.userId !== created.userId),
+        created,
+      ]);
+      setNewEmployer({
+        userId: '',
+        employeeId: '',
+        name: '',
+        email: '',
+        phone: '',
+        department: '',
+        password: '',
+      });
+      setAddFormOpen(false);
+      setAddEmployerMessage(`${created.name} was added to the employer roster.`);
+    } catch (submitError) {
+      setAddEmployerError(
+        submitError instanceof Error ? submitError.message : 'Unable to add employer'
+      );
+    } finally {
+      setSavingEmployer(false);
+    }
+  };
+
+  const assignReport = async (report: ReportRecord) => {
+    if (typeof assignmentEmployer?.userId !== 'string' || !assignmentEmployer.userId.trim()) {
+      setAssignmentError('This employee record has no userId and cannot be assigned a task.');
+      return;
+    }
+    const reportId = getReportField(report, 'reportId');
+    if (typeof reportId !== 'string' || !reportId.trim()) {
+      setAssignmentError('This report has no reportId and cannot be assigned.');
       return;
     }
 
-    setSaving(true);
+    setUpdatingReportId(reportId);
+    setAssignmentError(null);
     try {
-      const payload: EmployerRequest = {
-        name: formState.name,
-        role: formState.role,
-        email: formState.email,
-        phone: formState.phone,
-        location: formState.location,
-        status: formState.status,
-        notes: formState.notes,
-      };
-
-      const updated = editingId
-        ? await updateEmployer(editingId, payload)
-        : await createEmployer(payload);
-
-      setMessage(editingId ? 'Employer updated successfully.' : 'Employer added successfully.');
-      setEmployers((current) => {
-        if (editingId) {
-          return current.map((item) => (item._id === updated._id ? updated : item));
-        }
-        return [updated, ...current];
+      await createEmployerTask({
+        assignedUserId: assignmentEmployer.userId,
+        reportId,
       });
-      resetForm();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setReports((currentReports) =>
+        currentReports.map((currentReport) => {
+          if (getReportField(currentReport, 'reportId') !== reportId) return currentReport;
+          return withReportStatus(currentReport, 'assigned');
+        })
+      );
+      setAssignmentMessage(
+        `Report ${reportId} assigned to ${formatValue(assignmentEmployer.name)}.`
+      );
+    } catch (submitError) {
+      setAssignmentError(submitError instanceof Error ? submitError.message : 'Unable to assign task');
     } finally {
-      setSaving(false);
+      setUpdatingReportId(null);
     }
   };
 
-  const handleEdit = (employer: Employer) => {
-    setEditingId(employer._id);
-    setFormState({
-      name: employer.name,
-      role: employer.role,
-      email: employer.email,
-      phone: employer.phone,
-      location: employer.location ?? '',
-      status: employer.status,
-      notes: employer.notes ?? '',
-    });
-    setMessage(null);
-    setError(null);
-  };
+  const unassignReportFromEmployer = async (report: ReportRecord) => {
+    const reportId = getReportField(report, 'reportId');
+    if (typeof reportId !== 'string' || !reportId.trim()) {
+      setAssignmentError('This report has no reportId and cannot be unassigned.');
+      return;
+    }
 
-  const handleDelete = async (id: string) => {
-    const confirmed = window.confirm('Remove this employer from the workforce list?');
-    if (!confirmed) return;
+    setUpdatingReportId(reportId);
+    setAssignmentError(null);
+    setAssignmentMessage(null);
     try {
-      await deleteEmployer(id);
-      setEmployers((current) => current.filter((item) => item._id !== id));
-      setMessage('Employer removed successfully.');
-      if (editingId === id) {
-        resetForm();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      await unassignReport(reportId);
+      setReports((currentReports) =>
+        currentReports.map((currentReport) =>
+          getReportField(currentReport, 'reportId') === reportId
+            ? withReportStatus(currentReport, 'unassigned')
+            : currentReport
+        )
+      );
+      setAssignmentMessage(`Report ${reportId} is now unassigned.`);
+    } catch (updateError) {
+      setAssignmentError(
+        updateError instanceof Error ? updateError.message : 'Unable to unassign report'
+      );
+    } finally {
+      setUpdatingReportId(null);
     }
   };
 
   return (
     <div className="space-y-6">
+      {assignmentMessage ? (
+        <div role="status" className="flex items-center gap-3 rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-300">
+          <CheckCircle2 size={17} className="shrink-0" />
+          <span>{assignmentMessage}</span>
+        </div>
+      ) : null}
+      {addEmployerMessage ? (
+        <div role="status" className="flex items-center gap-3 rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-300">
+          <CheckCircle2 size={17} className="shrink-0" />
+          <span>{addEmployerMessage}</span>
+        </div>
+      ) : null}
+
       <div className="grid gap-5 md:grid-cols-4">
-        <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
+        <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel md:col-span-2">
           <div className="flex items-center gap-4 text-slate-300">
             <Users size={20} />
             <div>
-              <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Workforce</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{summary.total}</p>
+              <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Employer users</p>
+              <p className="mt-2 text-3xl font-semibold text-white">{loading ? '—' : employers.length}</p>
             </div>
           </div>
         </div>
-        <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
-          <div className="flex items-center gap-4 text-slate-300">
-            <CheckCircle2 size={20} />
-            <div>
-              <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Available</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{summary.available}</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
-          <div className="flex items-center gap-4 text-slate-300">
-            <Briefcase size={20} />
-            <div>
-              <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Assigned</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{summary.assigned}</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
-          <div className="flex items-center gap-4 text-slate-300">
-            <CircleDashed size={20} />
-            <div>
-              <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Off Duty</p>
-              <p className="mt-2 text-3xl font-semibold text-white">{summary.offDuty}</p>
-            </div>
-          </div>
+        <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel md:col-span-2">
+          <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Data source</p>
+          <p className="mt-3 text-base font-semibold text-white">GarbageGuardianUsers</p>
+          <p className="mt-1 text-sm text-slate-400">Users identified by employeeId, employee role, or EMP-prefixed userId are displayed. Stored Employee ID is shown separately from the ID derived from userId.</p>
         </div>
       </div>
 
@@ -196,85 +313,101 @@ function EmployersPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-2xl font-semibold text-white">Field Workforce Management</h3>
-            <p className="mt-2 text-sm text-slate-400">Add, update, and view your on-field workers with real-time status and assignment details.</p>
+            <p className="mt-2 text-sm text-slate-400">Employer users from the existing mobile-app user directory.</p>
           </div>
-          <button
-            type="button"
-            onClick={resetForm}
-            className="inline-flex items-center justify-center gap-2 rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white transition hover:border-brand-400/40 hover:bg-slate-900"
-          >
-            <Plus size={16} /> New Employer
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={openAddEmployerForm}
+              className="inline-flex items-center justify-center gap-2 rounded-3xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-400"
+            >
+              <Plus size={15} />
+              Add Employer
+            </button>
+            <button
+              type="button"
+              onClick={() => setRefreshKey((key) => key + 1)}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white transition hover:border-brand-400/40 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[1.4fr_0.85fr]">
-        <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <div>
-              <h4 className="text-xl font-semibold text-white">Employer Roster</h4>
-              <p className="mt-2 text-sm text-slate-400">Track who is free for work, assigned to routes, or currently off duty.</p>
-            </div>
-            <span className="rounded-full bg-slate-900/70 px-4 py-2 text-xs uppercase tracking-[0.24em] text-slate-400">{loading ? 'Loading...' : `${employers.length} records`}</span>
+      <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div>
+            <h4 className="text-xl font-semibold text-white">Employer Roster</h4>
+            <p className="mt-2 text-sm text-slate-400">Showing user records matching the employee fields in the existing directory.</p>
           </div>
+          <span className="rounded-full bg-slate-900/70 px-4 py-2 text-xs uppercase tracking-[0.24em] text-slate-400">
+            {loading ? 'Loading...' : `${employers.length} records`}
+          </span>
+        </div>
 
-          {message || error ? (
-            <div className="mb-4 rounded-3xl border border-white/10 bg-slate-900/80 p-4 text-sm text-slate-200">
-              {message ? <p className="text-emerald-300">{message}</p> : null}
-              {error ? <p className="text-rose-300">{error}</p> : null}
-            </div>
-          ) : null}
+        {error ? (
+          <div role="alert" className="mb-4 flex items-start gap-3 rounded-3xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-300">
+            <AlertCircle size={17} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        ) : null}
 
-          <div className="overflow-hidden rounded-[28px] border border-white/10">
-            <table className="min-w-full divide-y divide-white/10 text-sm text-left text-slate-300">
+        <div className="overflow-hidden rounded-[28px] border border-white/10">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-white/10 text-left text-sm text-slate-300">
               <thead className="bg-slate-950/80 text-slate-400">
                 <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Actions</th>
+                  {columns.map((column) => (
+                    <th key={column} scope="col" className="whitespace-nowrap px-4 py-3">
+                      {formatLabel(column)}
+                    </th>
+                  ))}
+                  <th scope="col" className="whitespace-nowrap px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10 bg-slate-900/70">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-slate-400">Fetching employer data...</td>
+                    <td colSpan={columns.length + 1} className="px-4 py-6 text-center text-slate-400">
+                      Fetching employer users...
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={columns.length + 1} className="px-4 py-6 text-center text-slate-400">
+                      Employer data could not be loaded.
+                    </td>
                   </tr>
                 ) : employers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-slate-400">No employers have been added yet.</td>
+                    <td colSpan={columns.length + 1} className="px-4 py-6 text-center text-slate-400">
+                      No employee records found in the directory.
+                    </td>
                   </tr>
                 ) : (
-                  employers.map((employer) => (
-                    <tr key={employer._id} className="hover:bg-slate-900/90">
-                      <td className="px-4 py-4 font-medium text-white">{employer.name}</td>
-                      <td className="px-4 py-4 text-slate-300">{employer.role}</td>
-                      <td className="px-4 py-4 text-slate-300">{employer.email}</td>
-                      <td className="px-4 py-4 text-slate-300">{employer.phone}</td>
+                  employers.map((employer, index) => (
+                    <tr key={String(employer.userId ?? employer.name ?? index)} className="hover:bg-slate-900/90">
+                      {columns.map((column) => (
+                        <td key={column} className="max-w-sm px-4 py-4 text-slate-300">
+                          <span className="block max-w-sm truncate" title={formatValue(employer[column])}>
+                            {formatValue(employer[column])}
+                          </span>
+                        </td>
+                      ))}
                       <td className="px-4 py-4">
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusClasses(employer.status)}`}>
-                          {statusLabel(employer.status)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(employer)}
-                            className="inline-flex items-center rounded-3xl bg-white/5 px-3 py-2 text-xs text-slate-200 transition hover:bg-white/10"
-                          >
-                            <Edit3 size={14} /> Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(employer._id)}
-                            className="inline-flex items-center rounded-3xl bg-rose-500/10 px-3 py-2 text-xs text-rose-300 transition hover:bg-rose-500/15"
-                          >
-                            <Trash2 size={14} /> Delete
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openAssignmentForm(employer)}
+                          disabled={typeof employer.userId !== 'string' || !employer.userId.trim()}
+                          className="inline-flex items-center gap-2 rounded-2xl bg-brand-500/15 px-3 py-2 text-sm font-medium text-brand-200 transition hover:bg-brand-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                          title={typeof employer.userId === 'string' ? 'Assign a task' : 'This record has no userId'}
+                        >
+                          <Plus size={15} />
+                          Assign
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -283,104 +416,275 @@ function EmployersPage() {
             </table>
           </div>
         </div>
-
-        <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h4 className="text-xl font-semibold text-white">Add / Edit Employer</h4>
-              <p className="mt-2 text-sm text-slate-400">Save workforce records that can be used for route planning and field assignments.</p>
-            </div>
-            <span className="rounded-full bg-slate-900/70 px-3 py-2 text-xs uppercase tracking-[0.24em] text-slate-400">{editingId ? 'Edit' : 'Create'}</span>
-          </div>
-
-          <div className="mt-6 space-y-4">
-            <div>
-              <label className="block text-sm text-slate-400">Full Name</label>
-              <input
-                value={formState.name}
-                onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-white outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400">Role</label>
-              <select
-                value={formState.role}
-                onChange={(e) => setFormState({ ...formState, role: e.target.value as EmployerRequest['role'] })}
-                className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-white outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-              >
-                {employerRoles.map((role) => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400">Email</label>
-              <input
-                type="email"
-                value={formState.email}
-                onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-white outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400">Phone</label>
-              <input
-                value={formState.phone}
-                onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
-                className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-white outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400">Location</label>
-              <input
-                value={formState.location}
-                onChange={(e) => setFormState({ ...formState, location: e.target.value })}
-                placeholder="Optional area or district"
-                className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-white outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400">Current Status</label>
-              <select
-                value={formState.status}
-                onChange={(e) => setFormState({ ...formState, status: e.target.value as Employer['status'] })}
-                className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-white outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-              >
-                {employerStatusOptions.map((status) => (
-                  <option key={status} value={status}>{statusLabel(status)}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400">Notes</label>
-              <textarea
-                value={formState.notes}
-                onChange={(e) => setFormState({ ...formState, notes: e.target.value })}
-                rows={4}
-                className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-white outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20"
-              />
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex items-center justify-center gap-2 rounded-3xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Add Employer'}
-              </button>
-              <button
-                type="button"
-                onClick={resetForm}
-                className="inline-flex items-center justify-center rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-slate-200 transition hover:border-brand-400/40 hover:bg-slate-900"
-              >
-                Reset Form
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
+
+      {addFormOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !savingEmployer) setAddFormOpen(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-employer-title"
+            className="w-full max-w-2xl rounded-[32px] border border-white/10 bg-slate-950 p-6 shadow-panel"
+          >
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Employer directory</p>
+                <h3 id="add-employer-title" className="mt-2 text-2xl font-semibold text-white">Add Employer</h3>
+                <p className="mt-2 text-sm text-slate-400">
+                  This employee record will be saved to GarbageGuardianUsers.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddFormOpen(false)}
+                disabled={savingEmployer}
+                aria-label="Close add employer form"
+                className="rounded-xl p-2 text-slate-400 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={(event) => void submitNewEmployer(event)} className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {([
+                  ['userId', 'User ID *'],
+                  ['employeeId', 'Employee ID *'],
+                ] as const).map(([field, label]) => (
+                  <label key={field} className="block space-y-2">
+                    <span className="text-sm text-slate-300">{label} (auto-generated)</span>
+                    <input
+                      type="text"
+                      value={
+                        generatingEmployerIds
+                          ? 'Generating...'
+                          : newEmployer[field] || 'Unable to generate'
+                      }
+                      readOnly
+                      required
+                      aria-readonly="true"
+                      className="w-full cursor-not-allowed rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm text-slate-300 outline-none"
+                    />
+                  </label>
+                ))}
+                {([
+                  ['name', 'Name'],
+                  ['email', 'Email'],
+                  ['phone', 'Phone'],
+                  ['department', 'Department'],
+                  ['password', 'Initial password'],
+                ] as const).map(([field, label]) => (
+                  <label key={field} className={`block space-y-2 ${field === 'password' ? 'sm:col-span-2' : ''}`}>
+                    <span className="text-sm text-slate-300">{label}{['name', 'email', 'password'].includes(field) ? ' *' : ''}</span>
+                    <input
+                      type={field === 'email' ? 'email' : field === 'password' ? 'password' : 'text'}
+                      value={newEmployer[field]}
+                      onChange={(event) =>
+                        setNewEmployer((current) => ({ ...current, [field]: event.target.value }))
+                      }
+                      required={['name', 'email', 'password'].includes(field)}
+                      minLength={field === 'password' ? 8 : undefined}
+                      autoComplete={field === 'password' ? 'new-password' : field === 'email' ? 'email' : 'off'}
+                      className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-brand-400/50"
+                    />
+                  </label>
+                ))}
+              </div>
+
+              {addEmployerError ? (
+                <div role="alert" className="flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-300">
+                  <AlertCircle size={17} className="mt-0.5 shrink-0" />
+                  <span>{addEmployerError}</span>
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => void refreshGeneratedEmployerIds()}
+                  disabled={savingEmployer || generatingEmployerIds}
+                  className="mr-auto rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-300 transition hover:bg-white/5 disabled:opacity-50"
+                >
+                  {generatingEmployerIds ? 'Generating IDs...' : 'Generate new IDs'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddFormOpen(false)}
+                  disabled={savingEmployer}
+                  className="rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-300 transition hover:bg-white/5 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    savingEmployer ||
+                    generatingEmployerIds ||
+                    !newEmployer.userId ||
+                    !newEmployer.employeeId
+                  }
+                  className="inline-flex items-center gap-2 rounded-2xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {savingEmployer ? <LoaderCircle size={15} className="animate-spin" /> : <Plus size={15} />}
+                  {savingEmployer ? 'Adding...' : 'Add Employer'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {assignmentEmployer ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !updatingReportId) setAssignmentEmployer(null);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="assign-task-title"
+            className="w-full max-w-xl rounded-[32px] border border-white/10 bg-slate-950 p-6 shadow-panel"
+          >
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm uppercase tracking-[0.24em] text-slate-400">Employer assignment</p>
+                <h3 id="assign-task-title" className="mt-2 text-2xl font-semibold text-white">Assign a report</h3>
+                <p className="mt-2 text-sm text-slate-400">
+                  For {formatValue(assignmentEmployer.name)} · {assignmentEmployer.userId}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAssignmentEmployer(null)}
+                disabled={Boolean(updatingReportId)}
+                aria-label="Close report assignment form"
+                className="rounded-xl p-2 text-slate-400 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <p className="text-sm text-slate-400">
+                Select a report to create an assigned task for this employer.
+              </p>
+              {reportsLoading ? (
+                <div className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-slate-900/60 p-8 text-sm text-slate-400">
+                  <LoaderCircle size={16} className="animate-spin" />
+                  Loading reports...
+                </div>
+              ) : reportsError ? (
+                <div role="alert" className="flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-300">
+                  <AlertCircle size={17} className="mt-0.5 shrink-0" />
+                  <span>{reportsError}</span>
+                </div>
+              ) : reports.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-400">
+                  No reports are available to assign.
+                </div>
+              ) : (
+                <div className="max-h-[50vh] overflow-auto rounded-2xl border border-white/10">
+                  <table className="min-w-full divide-y divide-white/10 text-left text-sm text-slate-300">
+                    <thead className="sticky top-0 bg-slate-950 text-xs uppercase tracking-wider text-slate-400">
+                      <tr>
+                        {['reportId', 'location', 'createdAt', 'binId', 'issueType', 'status'].map((field) => (
+                          <th key={field} scope="col" className="whitespace-nowrap px-4 py-3">
+                            {field === 'reportId'
+                              ? 'Report ID'
+                              : field === 'binId'
+                                ? 'Bin ID'
+                                : field === 'issueType'
+                                  ? 'Issue Type'
+                                  : formatLabel(field)}
+                          </th>
+                        ))}
+                        <th scope="col" className="whitespace-nowrap px-4 py-3">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10 bg-slate-900/70">
+                      {reports.map((report, index) => {
+                        const reportId = getReportField(report, 'reportId');
+                        const alreadyAssigned = isReportAssigned(report);
+                        const rowIsAssigning =
+                          typeof reportId === 'string' && updatingReportId === reportId;
+                        return (
+                          <tr key={typeof reportId === 'string' ? reportId : index}>
+                            {['reportId', 'location', 'createdAt', 'binId', 'issueType', 'status'].map((field) => (
+                              <td key={field} className="max-w-xs whitespace-nowrap px-4 py-3">
+                                <span className="block max-w-xs truncate" title={formatValue(getReportField(report, field))}>
+                                  {formatValue(getReportField(report, field))}
+                                </span>
+                              </td>
+                            ))}
+                            <td className="px-4 py-3">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void (alreadyAssigned
+                                    ? unassignReportFromEmployer(report)
+                                    : assignReport(report))
+                                }
+                                disabled={
+                                  Boolean(updatingReportId) ||
+                                  typeof reportId !== 'string' ||
+                                  !reportId.trim()
+                                }
+                                className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                                  alreadyAssigned
+                                    ? 'border border-amber-500/20 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20'
+                                    : 'bg-brand-500/15 text-brand-200 hover:bg-brand-500/25'
+                                }`}
+                              >
+                                {rowIsAssigning ? <LoaderCircle size={14} className="animate-spin" /> : null}
+                                {rowIsAssigning
+                                  ? alreadyAssigned
+                                    ? 'Unassigning...'
+                                    : 'Assigning...'
+                                  : alreadyAssigned
+                                    ? 'Unassign'
+                                    : 'Assign'}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {assignmentError ? (
+                <div role="alert" className="flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-300">
+                  <AlertCircle size={17} className="mt-0.5 shrink-0" />
+                  <span>{assignmentError}</span>
+                </div>
+              ) : null}
+              {assignmentMessage ? (
+                <div role="status" className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-300">
+                  <CheckCircle2 size={17} className="shrink-0" />
+                  <span>{assignmentMessage}</span>
+                </div>
+              ) : null}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setAssignmentEmployer(null)}
+                  disabled={Boolean(updatingReportId)}
+                  className="rounded-2xl border border-white/10 px-4 py-3 text-sm text-slate-300 transition hover:bg-white/5 disabled:opacity-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

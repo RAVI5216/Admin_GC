@@ -5,6 +5,8 @@ import { useNotifications } from '../context/NotificationContext';
 import { useEffect, useState } from 'react';
 import { useProfile } from '../context/ProfileContext';
 import { useMemo as useMemoReact } from 'react';
+import { fetchEmployers } from '../services/employerService';
+import type { EmployerUser } from '../types/employer';
 
 function SearchResultsPage() {
   const [searchParams] = useSearchParams();
@@ -13,17 +15,12 @@ function SearchResultsPage() {
   const { data } = useSmartBinData();
   const { notifications } = useNotifications();
   const { profile } = useProfile();
-  const [employers, setEmployers] = useState<any[]>([]);
+  const [employers, setEmployers] = useState<EmployerUser[]>([]);
 
   useEffect(() => {
     const loadEmployers = async () => {
       try {
-        const response = await fetch('http://localhost:5000/employers');
-        if (!response.ok) {
-          throw new Error('Unable to fetch employers');
-        }
-        const json = await response.json();
-        setEmployers(json);
+        setEmployers(await fetchEmployers());
       } catch (error) {
         console.error(error);
       }
@@ -51,7 +48,10 @@ function SearchResultsPage() {
   const employerResults = useMemoReact(() => {
     if (!query) return [];
     return employers.filter((employer) => {
-      const searchable = `${employer.name} ${employer.role} ${employer.email} ${employer.phone} ${employer.location ?? ''}`.toLowerCase();
+      const searchable = Object.values(employer)
+        .map((value) => typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''))
+        .join(' ')
+        .toLowerCase();
       return searchable.includes(query);
     });
   }, [query, employers]);
@@ -128,17 +128,21 @@ function SearchResultsPage() {
 
         <div className="rounded-[32px] border border-white/10 bg-slate-950/80 p-6 shadow-panel">
           <h4 className="text-xl font-semibold text-white">Employers</h4>
-          <p className="mt-2 text-sm text-slate-400">Matches on name, role, email, phone, or location.</p>
+          <p className="mt-2 text-sm text-slate-400">Matches on any field in the employer user record.</p>
           <div className="mt-6 space-y-4">
             {employerResults.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-white/10 bg-slate-950/70 p-4 text-sm text-slate-400">No employers found.</div>
             ) : (
-              employerResults.slice(0, 5).map((employer) => (
-                <div key={employer._id} className="rounded-3xl border border-white/10 bg-slate-950/70 p-4">
-                  <p className="font-semibold text-white">{employer.name}</p>
-                  <p className="mt-1 text-sm text-slate-400">{employer.role} • {employer.location ?? 'No location'}</p>
-                  <p className="mt-2 text-sm text-slate-400">{employer.email} • {employer.phone}</p>
-                </div>
+              employerResults.slice(0, 5).map((employer, index) => (
+              <div key={String(employer.userId ?? employer.Name ?? index)} className="rounded-3xl border border-white/10 bg-slate-950/70 p-4">
+                <p className="font-semibold text-white">{employer.name}</p>
+                <p className="mt-1 break-words text-sm text-slate-400">
+                  {Object.entries(employer)
+                    .filter(([key]) => key !== 'Name')
+                    .map(([key, value]) => `${key}: ${typeof value === 'object' ? JSON.stringify(value) : String(value ?? '')}`)
+                    .join(' • ')}
+                </p>
+              </div>
               ))
             )}
           </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, FileText, RefreshCw, X } from 'lucide-react';
-import { fetchReports, type ReportRecord } from '../services/reportService';
+import { AlertCircle, CheckCircle2, FileText, LoaderCircle, RefreshCw, X } from 'lucide-react';
+import { fetchReports, type ReportRecord, unassignReport } from '../services/reportService';
 
 const formatLabel = (key: string) =>
   key
@@ -13,12 +13,27 @@ const formatValue = (value: unknown) => {
   return String(value);
 };
 
+const getStatusKey = (report: ReportRecord) =>
+  Object.keys(report).find((key) => key.toLowerCase().replace(/[^a-z0-9]/g, '') === 'status') ??
+  'status';
+
+const isReportAssigned = (report: ReportRecord) =>
+  String(report[getStatusKey(report)] ?? '').trim().toLowerCase() === 'assigned';
+
+const withReportStatus = (report: ReportRecord, status: string): ReportRecord => ({
+  ...report,
+  [getStatusKey(report)]: status,
+});
+
 function ReportsPage() {
   const [reports, setReports] = useState<ReportRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<ReportRecord | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [updatingReportId, setUpdatingReportId] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -54,9 +69,47 @@ function ReportsPage() {
   }, [selectedReport]);
 
   const columns = useMemo(
-    () => Array.from(new Set(['reportId', ...reports.flatMap((report) => Object.keys(report))])),
+    () =>
+      Array.from(
+        new Set([
+          'reportId',
+          'location',
+          'createdAt',
+          'binId',
+          'issueType',
+          'status',
+          ...reports.flatMap((report) => Object.keys(report)),
+        ])
+      ),
     [reports]
   );
+
+  const updateReportStatus = async (report: ReportRecord) => {
+    setUpdatingReportId(report.reportId);
+    setStatusError(null);
+    setStatusMessage(null);
+    try {
+      const result = await unassignReport(report.reportId);
+      setReports((currentReports) =>
+        currentReports.map((currentReport) => {
+          if (currentReport.reportId !== result.reportId) return currentReport;
+          return withReportStatus(currentReport, result.status);
+        })
+      );
+      setSelectedReport((currentReport) =>
+        currentReport?.reportId === result.reportId
+          ? withReportStatus(currentReport, result.status)
+          : currentReport
+      );
+      setStatusMessage(`Report ${result.reportId} and its linked task are now unassigned.`);
+    } catch (updateError) {
+      setStatusError(
+        updateError instanceof Error ? updateError.message : 'Unable to unassign report'
+      );
+    } finally {
+      setUpdatingReportId(null);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -75,6 +128,19 @@ function ReportsPage() {
           Refresh
         </button>
       </div>
+
+      {statusError ? (
+        <div role="alert" className="flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-300">
+          <AlertCircle size={17} className="mt-0.5 shrink-0" />
+          <span>{statusError}</span>
+        </div>
+      ) : null}
+      {statusMessage ? (
+        <div role="status" className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-300">
+          <CheckCircle2 size={17} className="shrink-0" />
+          <span>{statusMessage}</span>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="flex h-40 items-center justify-center rounded-2xl border border-white/[0.06] bg-slate-900/60">
@@ -107,6 +173,7 @@ function ReportsPage() {
                       {formatLabel(column)}
                     </th>
                   ))}
+                  <th scope="col" className="px-4 py-3 font-medium">Assignment</th>
                   <th scope="col" className="px-4 py-3 font-medium">Details</th>
                 </tr>
               </thead>
@@ -120,6 +187,25 @@ function ReportsPage() {
                         </span>
                       </td>
                     ))}
+                    <td className="px-4 py-3">
+                      {isReportAssigned(report) ? (
+                        <button
+                          type="button"
+                          onClick={() => void updateReportStatus(report)}
+                          disabled={Boolean(updatingReportId)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {updatingReportId === report.reportId ? (
+                            <LoaderCircle size={14} className="animate-spin" />
+                          ) : null}
+                          {updatingReportId === report.reportId ? 'Unassigning...' : 'Unassign'}
+                        </button>
+                      ) : (
+                        <span className="inline-flex rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-slate-400">
+                          Unassigned
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <button
                         type="button"

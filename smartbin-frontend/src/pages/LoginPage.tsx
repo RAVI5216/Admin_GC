@@ -3,36 +3,25 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, KeyRound, Lock, Mail, Layers } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-type LoginMode = 'login' | 'request-reset' | 'confirm-reset';
+type LoginMode = 'login' | 'verify-login' | 'request-reset' | 'confirm-reset';
 
 function LoginPage() {
   const navigate = useNavigate();
   const {
     login,
+    verifyLoginOtp,
     loading,
-    savedEmail,
-    savedPassword,
-    user,
     requestPasswordReset,
     resetPassword,
   } = useAuth();
-  const [email, setEmail] = useState(() => savedEmail ?? user?.email ?? 'Megha123@gmail.com');
-  const [password, setPassword] = useState(() => savedPassword ?? 'Megha123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [mode, setMode] = useState<LoginMode>('login');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (savedEmail !== null) setEmail(savedEmail);
-    else if (user?.email) setEmail(user.email);
-  }, [savedEmail, user?.email]);
-
-  useEffect(() => {
-    if (savedPassword !== null) setPassword(savedPassword);
-  }, [savedPassword]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -50,8 +39,11 @@ function LoginPage() {
         return;
       }
       try {
-        await login(email, password);
-        navigate('/');
+        const challenge = await login(email, password);
+        setEmail(challenge.email);
+        setCode('');
+        setMode('verify-login');
+        setNotice(challenge.message);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Login failed');
       }
@@ -60,7 +52,10 @@ function LoginPage() {
 
     setSubmitting(true);
     try {
-      if (mode === 'request-reset') {
+      if (mode === 'verify-login') {
+        await verifyLoginOtp(email, code);
+        navigate('/');
+      } else if (mode === 'request-reset') {
         const message = await requestPasswordReset(email);
         setMode('confirm-reset');
         setNotice(message);
@@ -112,14 +107,22 @@ function LoginPage() {
             </button>
           )}
           <h2 className="text-lg font-semibold text-white">
-            {mode === 'login' ? 'Sign in to your account' : mode === 'request-reset' ? 'Forgot password?' : 'Reset your password'}
+            {mode === 'login'
+              ? 'Sign in to your account'
+              : mode === 'verify-login'
+                ? 'Verify your email'
+                : mode === 'request-reset'
+                  ? 'Forgot password?'
+                  : 'Reset your password'}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             {mode === 'login'
               ? 'Secure access for admin and collector management.'
-              : mode === 'request-reset'
-                ? 'We’ll email a one-time reset code to your admin account.'
-                : 'Enter the six-digit code from your email and choose a new password.'}
+              : mode === 'verify-login'
+                ? 'Enter the six-digit sign-in code sent to your admin email.'
+                : mode === 'request-reset'
+                  ? 'We’ll email a one-time reset code to your admin account.'
+                  : 'Enter the six-digit code from your email and choose a new password.'}
           </p>
 
           {error && (
@@ -147,6 +150,7 @@ function LoginPage() {
                   required
                   autoComplete="email"
                   value={email}
+                  readOnly={mode === 'verify-login'}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="collector@city.gov"
                   className="w-full bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600"
@@ -233,6 +237,30 @@ function LoginPage() {
               </>
             )}
 
+            {mode === 'verify-login' && (
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-slate-400" htmlFor="login-code">
+                  Sign-in verification code
+                </label>
+                <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3.5 py-2.5 transition focus-within:border-brand-500/60 focus-within:ring-1 focus-within:ring-brand-500/20">
+                  <KeyRound size={15} className="shrink-0 text-slate-500" />
+                  <input
+                    id="login-code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    required
+                    value={code}
+                    onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="6-digit code"
+                    className="w-full bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-600"
+                  />
+                </div>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading || submitting}
@@ -242,11 +270,36 @@ function LoginPage() {
                 ? 'Please wait…'
                 : mode === 'login'
                   ? 'Sign in'
-                  : mode === 'request-reset'
-                    ? 'Send reset code'
-                    : 'Update password'}
+                  : mode === 'verify-login'
+                    ? 'Verify and sign in'
+                    : mode === 'request-reset'
+                      ? 'Send reset code'
+                      : 'Update password'}
             </button>
           </form>
+
+          {mode === 'verify-login' && (
+            <button
+              type="button"
+              disabled={loading || submitting}
+              onClick={async () => {
+                setError(null);
+                setNotice(null);
+                setSubmitting(true);
+                try {
+                  const challenge = await login(email, password);
+                  setNotice(challenge.message);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Unable to resend sign-in code');
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              className="mt-4 w-full text-center text-xs font-medium text-brand-300 transition hover:text-brand-200 disabled:opacity-50"
+            >
+              Resend sign-in code
+            </button>
+          )}
 
           {mode === 'confirm-reset' && (
             <button

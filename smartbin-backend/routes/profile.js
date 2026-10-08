@@ -1,73 +1,174 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import { getDb } from '../db/mongo.js';
+import {
+  GetCommand,
+  PutCommand,
+  TransactWriteCommand,
+  UpdateCommand,
+} from '@aws-sdk/lib-dynamodb';
+import {
+  DASH_ADMIN_TABLE_NAME,
+  dashboardDynamoDb,
+  scanDashboardItems,
+} from '../db/dynamo.js';
+import { logger } from '../utils/logger.js';
 
 const PROFILE_ID = 'collector_profile';
 
-const ensureProfileData = async () => {
-  const db = getDb();
-  const existing = await db.collection('profiles').findOne({ _id: PROFILE_ID });
-  if (existing) {
-    return existing;
-  }
-
-  const defaultProfile = {
-    _id: PROFILE_ID,
-    collectorName: 'Megha Mudholkar',
-    role: 'Field Collector',
-    email: 'Megha123@gmail.com',
-    phone: '+91 98765 43210',
-    avatar: null,
-  };
-  await db.collection('profiles').insertOne(defaultProfile);
-  return defaultProfile;
+const listAdminAccounts = async (dynamoDb) => {
+  return scanDashboardItems(dynamoDb, {
+    TableName: DASH_ADMIN_TABLE_NAME,
+    FilterExpression: '#recordType = :admin',
+    ExpressionAttributeNames: { '#recordType': 'recordType' },
+    ExpressionAttributeValues: { ':admin': 'admin' },
+  });
 };
 
-const saveProfileData = async (profile) => {
-  const db = getDb();
-  await db.collection('profiles').updateOne({ _id: PROFILE_ID }, { $set: profile }, { upsert: true });
+const findProfileAccount = async (dynamoDb) => {
+  const accounts = await listAdminAccounts(dynamoDb);
+  return accounts.find((account) => account.profileId === PROFILE_ID) ?? accounts[0] ?? null;
 };
 
-export const createProfileRouter = () => {
+const toProfileResponse = (account) => ({
+  collectorName: account.collectorName ?? account.name ?? '',
+  role: account.profileRole ?? 'Admin',
+  email: account.email,
+  phone: account.phone ?? '',
+  avatar: account.avatar ?? null,
+});
+
+export const createProfileRouter = ({ dynamoDb = dashboardDynamoDb } = {}) => {
   const router = express.Router();
 
   router.get('/', async (req, res) => {
     try {
-      const profile = await ensureProfileData();
-      res.json(profile);
+      const account = await findProfileAccount(dynamoDb);
+      if (!account) {
+        return res.status(404).json({ error: 'No dashboard admin profile is configured' });
+      }
+      return res.json(toProfileResponse(account));
     } catch (error) {
-      res.status(500).json({ error: 'Unable to load profile data' });
+      logger.error('Unable to load dashboard profile', error instanceof Error ? error.message : String(error));
+      return res.status(500).json({ error: 'Unable to load profile data' });
     }
   });
 
   router.put('/', async (req, res) => {
-    const { collectorName, role, email, phone, avatar, password } = req.body;
+    const collectorName =
+      typeof req.body?.collectorName === 'string' ? req.body.collectorName.trim() : '';
+    const role = typeof req.body?.role === 'string' ? req.body.role.trim() : '';
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+    const phone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
+    const avatar =
+      typeof req.body?.avatar === 'string' || req.body?.avatar === null ? req.body.avatar : null;
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+
     if (!collectorName || !role || !email || !phone) {
       return res.status(400).json({ error: 'collectorName, role, email, and phone are required' });
     }
 
-    const updatedProfile = { collectorName, role, email, phone, avatar: avatar ?? null };
     try {
-      const db = getDb();
-      const currentProfile = await ensureProfileData();
-      const authUpdate = {
-        email,
-        name: collectorName,
-      };
-      if (password) {
-        authUpdate.passwordHash = await bcrypt.hash(password, 10);
+      const account = await findProfileAccount(dynamoDb);
+      if (!account) {
+        return res.status(404).json({ error: 'No dashboard admin profile is configured' });
       }
 
-      await db.collection('adminUsers').updateOne(
-        { email: currentProfile.email },
-        { $set: authUpdate },
-        { upsert: true }
-      );
+      const emailChanged = email !== account.email;
+      if (emailChanged) {
+        const accounts = await listAdminAccounts(dynamoDb);
+        const duplicateEmail = accounts.some(
+          (candidate) =>
+            candidate.email !== account.email &&
+            typeof candidate.email === 'string' &&
+            candidate.email.toLowerCase() === email.toLowerCase()
+        );
+        if (duplicateEmail) {
+          return res.status(409).json({ error: 'Another admin account already uses this email' });
+        }
+      }
 
-      await saveProfileData(updatedProfile);
-      res.json(updatedProfile);
+      const passwordHash = password ? await bcrypt.hash(password, 10) : account.passwordHash;
+      const updatedAccount = {
+        ...account,
+        email,
+        name: collectorName,
+        collectorName,
+        profileId: PROFILE_ID,
+        profileRole: role,
+        phone,
+        avatar,
+        ...(passwordHash ? { passwordHash } : {}),
+      };
+      if (emailChanged) {
+        delete updatedAccount.passwordResetCodeHash;
+        delete updatedAccount.passwordResetExpiresAt;
+        delete updatedAccount.passwordResetAttempts;
+        delete updatedAccount.passwordResetRequestedAt;
+      }
+
+      if (emailChanged) {
+        const existingAtNewEmail = await dynamoDb.send(
+          new GetCommand({
+            TableName: DASH_ADMIN_TABLE_NAME,
+            Key: { email },
+          })
+        );
+        if (existingAtNewEmail.Item) {
+          return res.status(409).json({ error: 'An account already uses this email' });
+        }
+        await dynamoDb.send(
+          new TransactWriteCommand({
+            TransactItems: [
+              {
+                Put: {
+                  TableName: DASH_ADMIN_TABLE_NAME,
+                  Item: updatedAccount,
+                  ConditionExpression: 'attribute_not_exists(email)',
+                },
+              },
+              {
+                Delete: {
+                  TableName: DASH_ADMIN_TABLE_NAME,
+                  Key: { email: account.email },
+                  ConditionExpression: '#recordType = :admin',
+                  ExpressionAttributeNames: { '#recordType': 'recordType' },
+                  ExpressionAttributeValues: { ':admin': 'admin' },
+                },
+              },
+            ],
+          })
+        );
+      } else {
+        await dynamoDb.send(
+          new UpdateCommand({
+            TableName: DASH_ADMIN_TABLE_NAME,
+            Key: { email: account.email },
+            UpdateExpression:
+              'SET #name = :name, collectorName = :collectorName, profileId = :profileId, profileRole = :profileRole, phone = :phone, avatar = :avatar' +
+              (passwordHash ? ', passwordHash = :passwordHash' : ''),
+            ConditionExpression: '#recordType = :admin',
+            ExpressionAttributeNames: {
+              '#name': 'name',
+              '#recordType': 'recordType',
+            },
+            ExpressionAttributeValues: {
+              ':name': collectorName,
+              ':collectorName': collectorName,
+              ':profileId': PROFILE_ID,
+              ':profileRole': role,
+              ':phone': phone,
+              ':avatar': avatar,
+              ':admin': 'admin',
+              ...(passwordHash ? { ':passwordHash': passwordHash } : {}),
+            },
+          })
+        );
+      }
+
+      return res.json(toProfileResponse(updatedAccount));
     } catch (error) {
-      res.status(500).json({ error: 'Unable to save profile data' });
+      logger.error('Unable to save dashboard profile', error instanceof Error ? error.message : String(error));
+      return res.status(500).json({ error: 'Unable to save profile data' });
     }
   });
 
