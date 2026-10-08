@@ -7,6 +7,7 @@ import { connectMongo, getDb } from './db/mongo.js';
 import { createHealthRouter } from './routes/health.js';
 import { createProfileRouter } from './routes/profile.js';
 import { createNotificationsRouter } from './routes/notifications.js';
+import { createReportsRouter } from './routes/reports.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createEmployerRouter } from './routes/employers.js';
 import { initializeSocket } from './socket/socket.js';
@@ -87,6 +88,7 @@ const getStatus = () => iotStatus;
 const healthRouter = createHealthRouter(getStatus);
 const profileRouter = createProfileRouter();
 const notificationsRouter = createNotificationsRouter();
+const reportsRouter = createReportsRouter();
 const authRouter = createAuthRouter();
 const employerRouter = createEmployerRouter();
 
@@ -120,6 +122,7 @@ app.get("/test", (req, res) => {
   });
 });
 app.use('/notifications', notificationsRouter);
+app.use('/reports', reportsRouter);
 app.use('/auth', authRouter);
 app.use('/employers', employerRouter);
 

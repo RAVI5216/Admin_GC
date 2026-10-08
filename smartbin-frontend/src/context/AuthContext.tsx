@@ -2,6 +2,28 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 const API_BASE = 'http://localhost:5000';
 
+const readApiResponse = async (response: Response, fallback: string) => {
+  const responseText = await response.text();
+  let data: Record<string, unknown>;
+
+  try {
+    data = responseText ? JSON.parse(responseText) as Record<string, unknown> : {};
+  } catch {
+    if (responseText.trimStart().startsWith('<')) {
+      throw new Error(
+        'The backend returned an HTML page instead of an API response. Restart the backend so it loads the password reset routes.'
+      );
+    }
+    throw new Error('The backend returned an invalid response. Check that the backend API is running.');
+  }
+
+  if (!response.ok) {
+    throw new Error(typeof data.error === 'string' ? data.error : fallback);
+  }
+
+  return data;
+};
+
 type User = {
   name: string;
   email: string;
@@ -13,6 +35,8 @@ type AuthContextType = {
   savedEmail: string | null;
   savedPassword: string | null;
   login: (email: string, password: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<string>;
+  resetPassword: (email: string, code: string, password: string) => Promise<string>;
   logout: () => void;
   updateUser: (user: User) => void;
   updateSavedEmail: (email: string) => void;
@@ -35,9 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Login failed');
+      const data = await readApiResponse(res, 'Login failed');
+      if (typeof data.email !== 'string' || typeof data.name !== 'string') {
+        throw new Error('The backend returned an invalid login response.');
       }
       setUser({ name: data.name, email: data.email });
       setSavedEmail(data.email);
@@ -48,6 +72,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await readApiResponse(res, 'Unable to request a password reset');
+    if (typeof data.message !== 'string') {
+      throw new Error('The backend returned an invalid password reset response.');
+    }
+    return data.message;
+  };
+
+  const resetPassword = async (email: string, code: string, password: string) => {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code, password }),
+    });
+    const data = await readApiResponse(res, 'Unable to reset password');
+    if (typeof data.message !== 'string') {
+      throw new Error('The backend returned an invalid password reset response.');
+    }
+    setSavedPassword(null);
+    localStorage.removeItem('adminPassword');
+    return data.message;
   };
 
   const logout = () => {
@@ -99,6 +151,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         savedEmail,
         savedPassword,
         login,
+        requestPasswordReset,
+        resetPassword,
         logout,
         updateUser,
         updateSavedEmail,

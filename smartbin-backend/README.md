@@ -19,7 +19,13 @@ Create `smartbin-backend/.env` (it is ignored by Git):
 ```env
 PORT=5000
 MONGODB_URI=<your MongoDB URI>
+AWS_REGION=ap-southeast-2
 SMARTBIN_IOT_SERVICE_URL=http://54.206.16.121
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=<your Gmail address>
+SMTP_PASSWORD=<your Gmail app password>
+SMTP_FROM=<your Gmail address>
 ```
 
 The frontend's `smartbin-frontend/.env.local` is also ignored by Git and should contain:
@@ -44,4 +50,8 @@ npm install
 npm start
 ```
 
-The backend listens on port 5000 by default. Useful endpoints include `GET /`, `GET /health`, `GET /profile`, `GET /notifications`, `POST /auth/login`, and `GET /employers`.
+The backend listens on port 5000 by default. Useful endpoints include `GET /`, `GET /health`, `GET /profile`, `GET /notifications`, `GET /reports`, `POST /auth/login`, and `GET /employers`.
+
+`GET /reports` reads the existing `GarbageGuardianReports` DynamoDB table in `ap-southeast-2`. The backend runtime identity must have `dynamodb:Scan` permission for that table. Configure AWS credentials through the standard AWS SDK credential provider chain (for example, an IAM role in AWS or a local AWS CLI profile); do not put AWS access keys in the `.env` file. The endpoint returns report items as stored, and the admin page renders their attributes dynamically.
+
+Admin password recovery uses `POST /auth/forgot-password` to email a six-digit code and `POST /auth/reset-password` to verify the code and update `adminUsers.passwordHash`. Configure Gmail SMTP with an app password in the backend `.env`; never use or commit your regular Gmail password. Codes expire after 10 minutes, are single-use, and are limited to five verification attempts.
