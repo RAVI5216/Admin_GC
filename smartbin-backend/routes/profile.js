@@ -12,6 +12,7 @@ import {
   scanDashboardItems,
 } from '../db/dynamo.js';
 import { logger } from '../utils/logger.js';
+import { requireAuth, signToken } from '../middleware/auth.js';
 
 const PROFILE_ID = 'collector_profile';
 
@@ -24,9 +25,11 @@ const listAdminAccounts = async (dynamoDb) => {
   });
 };
 
-const findProfileAccount = async (dynamoDb) => {
-  const accounts = await listAdminAccounts(dynamoDb);
-  return accounts.find((account) => account.profileId === PROFILE_ID) ?? accounts[0] ?? null;
+const findAccountByEmail = async (dynamoDb, email) => {
+  const result = await dynamoDb.send(
+    new GetCommand({ TableName: DASH_ADMIN_TABLE_NAME, Key: { email } })
+  );
+  return result.Item?.recordType === 'admin' ? result.Item : null;
 };
 
 const toProfileResponse = (account) => ({
@@ -40,9 +43,10 @@ const toProfileResponse = (account) => ({
 export const createProfileRouter = ({ dynamoDb = dashboardDynamoDb } = {}) => {
   const router = express.Router();
 
-  router.get('/', async (req, res) => {
+  router.get('/', requireAuth, async (req, res) => {
     try {
-      const account = await findProfileAccount(dynamoDb);
+      // Use the authenticated user's email from the JWT
+      const account = await findAccountByEmail(dynamoDb, req.adminUser.email);
       if (!account) {
         return res.status(404).json({ error: 'No dashboard admin profile is configured' });
       }
@@ -53,7 +57,7 @@ export const createProfileRouter = ({ dynamoDb = dashboardDynamoDb } = {}) => {
     }
   });
 
-  router.put('/', async (req, res) => {
+  router.put('/', requireAuth, async (req, res) => {
     const collectorName =
       typeof req.body?.collectorName === 'string' ? req.body.collectorName.trim() : '';
     const role = typeof req.body?.role === 'string' ? req.body.role.trim() : '';
@@ -68,7 +72,7 @@ export const createProfileRouter = ({ dynamoDb = dashboardDynamoDb } = {}) => {
     }
 
     try {
-      const account = await findProfileAccount(dynamoDb);
+      const account = await findAccountByEmail(dynamoDb, req.adminUser.email);
       if (!account) {
         return res.status(404).json({ error: 'No dashboard admin profile is configured' });
       }
@@ -165,7 +169,14 @@ export const createProfileRouter = ({ dynamoDb = dashboardDynamoDb } = {}) => {
         );
       }
 
-      return res.json(toProfileResponse(updatedAccount));
+      const response = toProfileResponse(updatedAccount);
+      if (emailChanged) {
+        response.token = signToken({
+          email: updatedAccount.email,
+          name: updatedAccount.name ?? updatedAccount.collectorName ?? '',
+        });
+      }
+      return res.json(response);
     } catch (error) {
       logger.error('Unable to save dashboard profile', error instanceof Error ? error.message : String(error));
       return res.status(500).json({ error: 'Unable to save profile data' });

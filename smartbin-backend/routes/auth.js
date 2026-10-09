@@ -9,6 +9,7 @@ import {
   scanDashboardItems,
 } from '../db/dynamo.js';
 import { logger } from '../utils/logger.js';
+import { signToken } from '../middleware/auth.js';
 
 const RESET_CODE_TTL_MS = 10 * 60 * 1000;
 const RESET_REQUEST_COOLDOWN_MS = 60 * 1000;
@@ -278,7 +279,8 @@ export const createAuthRouter = ({
         })
       );
 
-      return res.json({ email: user.email, name: user.name ?? user.collectorName ?? '' });
+      const token = signToken({ email: user.email, name: user.name ?? user.collectorName ?? '' });
+      return res.json({ email: user.email, name: user.name ?? user.collectorName ?? '', token });
     } catch (error) {
       if (error?.name === 'ConditionalCheckFailedException') {
         return res.status(400).json({ error: 'Invalid or expired login code. Sign in again to request a new code.' });

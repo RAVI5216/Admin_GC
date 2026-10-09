@@ -36,6 +36,7 @@ type LoginChallenge = {
 
 type AuthContextType = {
   user: User | null;
+  token: string | null;
   loading: boolean;
   savedEmail: string | null;
   savedPassword: string | null;
@@ -45,6 +46,7 @@ type AuthContextType = {
   resetPassword: (email: string, code: string, password: string) => Promise<string>;
   logout: () => void;
   updateUser: (user: User) => void;
+  updateToken: (token: string) => void;
   updateSavedEmail: (email: string) => void;
   updateSavedPassword: (password: string) => void;
 };
@@ -53,6 +55,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [savedEmail, setSavedEmail] = useState<string | null>(null);
   const [savedPassword, setSavedPassword] = useState<string | null>(null);
@@ -86,14 +89,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email, code }),
       });
       const data = await readApiResponse(res, 'Login verification failed');
-      if (typeof data.email !== 'string' || typeof data.name !== 'string') {
+      if (typeof data.email !== 'string' || typeof data.name !== 'string' || typeof data.token !== 'string') {
         throw new Error('The backend returned an invalid login verification response.');
       }
       const user = { name: data.name, email: data.email };
       setUser(user);
+      setToken(data.token);
       setSavedEmail(data.email);
       localStorage.setItem('adminUser', JSON.stringify(user));
       localStorage.setItem('adminEmail', data.email);
+      localStorage.setItem('adminToken', data.token);
       if (pendingPassword.current) {
         setSavedPassword(pendingPassword.current);
         localStorage.setItem('adminPassword', pendingPassword.current);
@@ -135,12 +140,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setUser(null);
+    setToken(null);
     setSavedEmail(null);
     setSavedPassword(null);
     pendingPassword.current = null;
     localStorage.removeItem('adminUser');
     localStorage.removeItem('adminEmail');
     localStorage.removeItem('adminPassword');
+    localStorage.removeItem('adminToken');
   };
 
   const updateUser = (updated: User) => {
@@ -148,6 +155,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('adminUser', JSON.stringify(updated));
     setSavedEmail(updated.email);
     localStorage.setItem('adminEmail', updated.email);
+  };
+
+  const updateToken = (updatedToken: string) => {
+    setToken(updatedToken);
+    localStorage.setItem('adminToken', updatedToken);
   };
 
   const updateSavedEmail = (email: string) => {
@@ -165,6 +177,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (stored) {
       setUser(JSON.parse(stored));
     }
+    const storedToken = localStorage.getItem('adminToken');
+    if (storedToken) {
+      setToken(storedToken);
+    }
     const storedEmail = localStorage.getItem('adminEmail');
     if (storedEmail) {
       setSavedEmail(storedEmail);
@@ -179,6 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        token,
         loading,
         savedEmail,
         savedPassword,
@@ -188,6 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resetPassword,
         logout,
         updateUser,
+        updateToken,
         updateSavedEmail,
         updateSavedPassword,
       }}

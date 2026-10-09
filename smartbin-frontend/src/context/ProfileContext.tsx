@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useAuth } from './AuthContext';
 
 type Profile = {
   collectorName: string;
@@ -11,6 +12,7 @@ type Profile = {
 const API_BASE = 'http://localhost:5000';
 
 type ProfileUpdatePayload = Partial<Profile> & { password?: string | null };
+type ProfileResponse = Profile & { token?: string };
 
 const ProfileContext = createContext<{
   profile: Profile | null;
@@ -22,11 +24,19 @@ const ProfileContext = createContext<{
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const { user, token, updateToken } = useAuth();
 
   const load = async () => {
+    if (!user || !token) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/profile`);
+      const res = await fetch(`${API_BASE}/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
         setProfile(data);
@@ -43,7 +53,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     const onUpdate = () => load();
     window.addEventListener('profile-updated', onUpdate);
     return () => window.removeEventListener('profile-updated', onUpdate);
-  }, []);
+  }, [user, token]);
 
   const updateProfile = async (p: ProfileUpdatePayload) => {
     const body: Record<string, unknown> = {
@@ -59,7 +69,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
     const res = await fetch(`${API_BASE}/profile`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token ?? ''}`,
+      },
       body: JSON.stringify(body),
     });
     const text = await res.text();
@@ -73,7 +86,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       }
       throw new Error(errorMessage);
     }
-    const updated = text ? JSON.parse(text) : body;
+    const updated = (text ? JSON.parse(text) : body) as ProfileResponse;
+    if (updated.token) {
+      updateToken(updated.token);
+    }
     setProfile(updated);
     // emit an event for other parts of the app
     window.dispatchEvent(new Event('profile-updated'));
