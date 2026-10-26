@@ -1,0 +1,169 @@
+{
+  "model_name": "TF-IDF + Logistic Regression",
+  "algorithm": "Multinomial Logistic Regression with Softmax",
+  "feature_extractor": "TF-IDF (unigrams + bigrams, sublinear_tf)",
+  "total_training_samples": 210,
+  "num_classes": 7,
+  "classes": [
+    "Damaged Hardware",
+    "Dead Animal / Biohazard",
+    "Hazardous Waste",
+    "Illegal Dumping",
+    "Odor & Pest Infestation",
+    "Overflowing Bin",
+    "Vandalism & Fire Hazard"
+  ],
+  "metrics": {
+    "test_accuracy": 0.8095,
+    "macro_precision": 0.8294,
+    "macro_recall": 0.8095,
+    "macro_f1": 0.8091,
+    "weighted_f1": 0.8091,
+    "cross_validation": {
+      "n_splits": 5,
+      "fold_scores": [
+        0.881,
+        0.7619,
+        0.7143,
+        0.6905,
+        0.8095
+      ],
+      "mean_accuracy": 0.7714,
+      "std_deviation": 0.0683
+    }
+  },
+  "per_class_metrics": {
+    "Damaged Hardware": {
+      "precision": 0.667,
+      "recall": 0.667,
+      "f1_score": 0.667,
+      "support": 6,
+      "department": "Hardware Maintenance",
+      "severity": "low"
+    },
+    "Dead Animal / Biohazard": {
+      "precision": 0.857,
+      "recall": 1.0,
+      "f1_score": 0.923,
+      "support": 6,
+      "department": "Sanitation & Animal Control",
+      "severity": "high"
+    },
+    "Hazardous Waste": {
+      "precision": 1.0,
+      "recall": 0.667,
+      "f1_score": 0.8,
+      "support": 6,
+      "department": "Hazardous Materials Unit",
+      "severity": "critical"
+    },
+    "Illegal Dumping": {
+      "precision": 1.0,
+      "recall": 0.833,
+      "f1_score": 0.909,
+      "support": 6,
+      "department": "Municipal Enforcement & Heavy Haul",
+      "severity": "medium"
+    },
+    "Odor & Pest Infestation": {
+      "precision": 0.857,
+      "recall": 1.0,
+      "f1_score": 0.923,
+      "support": 6,
+      "department": "Sanitation & Pest Control",
+      "severity": "medium"
+    },
+    "Overflowing Bin": {
+      "precision": 0.625,
+      "recall": 0.833,
+      "f1_score": 0.714,
+      "support": 6,
+      "department": "Waste Collection",
+      "severity": "high"
+    },
+    "Vandalism & Fire Hazard": {
+      "precision": 0.8,
+      "recall": 0.667,
+      "f1_score": 0.727,
+      "support": 6,
+      "department": "Emergency & Maintenance Operations",
+      "severity": "critical"
+    }
+  },
+  "confusion_matrix": {
+    "labels": [
+      "Damaged Hardware",
+      "Dead Animal / Biohazard",
+      "Hazardous Waste",
+      "Illegal Dumping",
+      "Odor & Pest Infestation",
+      "Overflowing Bin",
+      "Vandalism & Fire Hazard"
+    ],
+    "matrix": [
+      [
+        4,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        6,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        4,
+        0,
+        0,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        5,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        6,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        4
+      ]
+    ]
+  }
+}

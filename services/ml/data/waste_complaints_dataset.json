@@ -1,0 +1,842 @@
+[
+  {
+    "text": "Garbage is overflowing near the college gate and trash is falling on the road.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "The dustbin outside the cafeteria is completely full and spilling over.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Trash can at bus stop is heaping with plastic bottles and paper cups.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "SmartBin02 is packed to the brim, people are throwing bags on the floor.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Waste bin near hostel B is full and nobody has cleared it for two days.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "The bin outside library entrance is overflowing with drink cartons and wrappers.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Waste container near sports ground is overloaded and litter is blowing in the wind.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Dustbin near main auditorium has garbage piling up on the pavement.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Garbage can near canteen is full to the top and trash is spilling around.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Bin at science block entrance is completely jammed with refuse.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Dumpster behind mess is overflowing with food wrappers and containers.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Trash bin near parking lot is overloaded and falling over.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Litter bin beside university garden is filled beyond capacity.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "SmartBin near the workshop is overfilled and unattended.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Excess waste is spilling out from the bin onto the walkway.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Bin near campus ATM is heaping with discarded slips and cardboard.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Overflowing garbage bin near student center needs urgent collection.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "The public dustbin on corner of campus road is totally packed with waste.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Bags of trash are falling off the top of the overfilled bin near wing C.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Garbage is spilling all over the walkway because the bin is not emptied.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Chemical drums and bottles with toxic warning signs dumped behind chemistry lab.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Found used medical syringes and blood vials thrown in regular trash bin.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Someone poured battery acid and motor oil into the street drain.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Hazardous asbestos insulation materials dumped near the construction site.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Strong pungent chemical smell coming from leaking container near science faculty.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Poison bottles and industrial solvents left open by the maintenance yard.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Pesticide cans and toxic agricultural chemicals discarded by the greenhouse.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Corrosive liquid leaking from a rusty metal drum near workshop area.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Medical biohazard waste bag containing needles and soiled dressings found in park.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Flammable solvent cans dumped in the common recycling receptacle.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Old car batteries leaking sulphuric acid onto the ground near parking.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Toxic paints and thinners abandoned in cardboard boxes near pharmacy lab.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Hospital waste including drip sets and scalpel blades dumped in ordinary bin.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Dangerous laboratory reagents discarded without neutralization behind building.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Biohazard marked red bag thrown into normal trash outside campus health center.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Unlabelled bottles with skull hazard logo left on the corner of service road.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Chemical spill of unknown solvent giving off burning fumes in parking bay.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Discarded fluorescent light tubes and toxic mercury lamps broken in dumpster.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Heavy industrial sludge and toxic residues dumped near perimeter fence.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Radioactive or biohazard warning symbol container found near storage shed.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Someone dumped broken concrete blocks, bricks and drywall in open ground.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Old discarded mattresses, broken sofas and wooden furniture left on roadside.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Truck dumped a huge pile of construction debris near the university back gate.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Commercial restaurant food cartons and grease traps dumped illegally in alley.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Pile of discarded automobile tires and rubber rims dumped by the river bank.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Contractor left piles of rubble, sand and tiles on the sidewalk overnight.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Unregistered vehicle offloaded renovation demolition waste in open field.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Industrial scrap metal, rusty pipes and corrugated sheets dumped in empty plot.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Massive pile of commercial cardboard and plastic packing crates discarded in bush.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Old broken refrigerator and washing machine dumped near sports complex.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Tree cuttings, garden waste and timber logs dumped illegally blocking footpath.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Construction company dumped bags of hardened cement and gravel on access road.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Vehicle dropped a trailer load of mixed building debris and sped away.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Bulk electronic waste including discarded cathode monitors dumped behind hostel.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Illegal fly-tipping of office partitions and desks in the vacant lot.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Asphalt scraping and road work rubble dumped along the perimeter wall.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Large unauthorized dump of wooden pallets and shipping crates in forest area.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Plumbing pipes and ceramic toilet bowls dumped on the vacant parcel.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Truckload of mixed household demolition junk dumped in drainage ditch.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Someone dumped truck tires and automotive parts on public service lane.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "The metal bin lid is completely smashed off and hinge is broken.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The ultrasonic fill sensor on SmartBin04 is cracked and dangling by wires.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Smart bin pedal mechanism is jammed, cannot step to open lid.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The solar panel on the compacting bin is shattered and not charging.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The wheel of the mobile waste cart has snapped off completely.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The smart bin door lock is broken and swings open into the pathway.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The outer metal casing of the bin is rusted through with sharp edges exposed.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Electronic display on SmartBin is dead and showing no sensor readings.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The bin frame has a heavy dent from vehicle collision and stands crooked.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Internal compaction piston is stuck and making loud grinding noises.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "SmartBin01 battery compartment cover is missing and exposed to rain.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The mounting bracket fixing the bin to pole is loose and wobbly.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Recycling compartment divider has snapped inside the bin.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The rubber seal around the bin rim is torn off allowing rainwater inside.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Bin handle has broken off making it impossible for staff to pull.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Level sensor lens is dirty or damaged, transmitting false reading.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Metal latch on the security gate of the dumpster is bent out of shape.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The spring in the self-closing flap has failed and flap remains open.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Base plate of bin is corroded and detached from concrete anchor.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Smart bin antenna is snapped off and device is offline.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The bin smells horrible and foul odor is entering the nearby classroom.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Foul stench coming from the dustbin, swarm of flies and mosquitoes everywhere.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Rats and rodents are infesting the trash area behind the food canteen.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Decaying food leftovers creating an unbearable rotting smell near student hostel.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Maggots crawling all over the bottom of the unwashed waste container.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Terrible stink of stale liquid stagnant inside the smart bin.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Pest infestation around dumpster, cockroaches and insects coming into offices.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Disgusting smell spreading across courtyard from unwashed bin.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Stray cats and rats tearing open rotting food bags causing unbearable odor.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Extreme rotting smell near girls hostel bin, needs disinfection spray.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Fly breeding and stinking slime accumulated at the base of the bin.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Horrendous odor of decaying fish and organic waste near staff quarters.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Heavy pest presence and disgusting sewer-like odor from the garbage pit.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "The bin needs washing and sanitizing because of repulsive rotten stench.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Flies buzzing around bin and foul odor making it impossible to sit nearby.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Rotten fruit and food smells awful near the market entrance bin.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Black mold and stench emanating from damp uncleaned waste bin.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Rodent infestation near cafeteria waste bin, rats running across patio.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Nauseating smell coming from compost bin near agricultural nursery.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Severe odor nuisance reported by residents near block D waste collection point.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Dead stray dog carcass lying beside the waste collection bin near back gate.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Decomposing cat carcass found inside the waste container, creating health risk.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Dead bird rotting on top of the trash can, covered in maggots and flies.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Decaying animal flesh and foul remains dumped in open container near lake.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Dead rat lying next to the foot pedal of the smart bin in canteen corridor.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Rotting sheep or cow carcass dumped near the university perimeter fence.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Dead stray animal body decaying in the sun near student residence hall.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Bloody butcher animal remains discarded in a plastic sack near highway entrance.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Carcass of dead puppy found inside garbage drum, urgent removal needed.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Decomposing dead animal causing biohazard contamination near campus water supply.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Dead rodent decomposing inside the recycling bin causing major health hazard.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Animal carcass infested with flies lying near primary school campus gate.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Decaying animal body needs immediate disposal and sanitation team with PPE.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Stray dog carcass hit by vehicle and dragged next to dustbin.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Rotting animal remains found wrapped in cloth near municipal boundary.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Severe biological hazard due to dead feral pig carcass near drainage canal.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Dead pigeons decaying inside ventilation shaft above waste sorting room.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Animal slaughter waste and guts dumped in public waste bin.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Decomposing dead animal carcass emitting putrid fumes near library lawn.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Dead cat body trapped inside the recycling container.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Someone set fire to the garbage inside the bin, smoke and flames rising.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Vandals overturned all smart bins and smashed the electronics with rocks.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Smoldering cigarette butt started a fire in the dry paper bin near library.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Bin on fire outside auditorium, flames spreading towards nearby tree.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "SmartBin06 was deliberately tipped over and spray-painted with graffiti.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Thick black smoke and burning plastic smell coming from dumpster near workshop.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Youths smashed the glass display of smart bin and tore out internal wires.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Arson attempt on campus waste facility, charred bins and scorched ground.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Burning embers thrown into bin, smoke filling the hallway.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Smart bin was uprooted from its concrete foundation and kicked into the ditch.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Small explosion occurred inside the bin after fireworks were thrown in.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Dumpster fire raging behind the kitchen loading dock.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Malicious damage to solar trash bin, solar panel ripped off and stolen.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Intentionally ignited trash can burning near parked vehicles.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Vandalized bin with broken sensors, someone poured glue into lock.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Active fire with sparks erupting from the lithium battery of smart bin.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Flaming trash container threatening nearby wooden fence.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Security incident: bin deliberately ignited during the night near gate 3.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Vandals broke into electronic enclosure and stole battery and SIM card.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Fire hazard: smoldering dry leaves and litter inside public bin.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Rubbish is falling out of the dustbin onto the sidewalk.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Trash receptacle near the admin block is completely packed.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Garbage bins are overflowing and dogs are pulling out trash bags.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Litter is piled high above the rim of the bin.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "SmartBin near workshop has not been emptied and is at 100% capacity.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Waste container outside campus hostel is bursting at the seams.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "The public waste bin at the campus gate has trash scattered around it.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Bin is overflowing with discarded lunch boxes and coffee cups.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "The collection box is totally full, please send a truck.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Trash overflowing near the sports pavilion.",
+    "category": "Overflowing Bin"
+  },
+  {
+    "text": "Spilled battery acid smoking on the asphalt in vehicle parking.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Found glass jar containing unknown yellow corrosive chemical.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Discarded pharmaceutical pills and expired syrup bottles dumped in bulk.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Someone threw lithium polymer batteries into regular waste causing smoke.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Toxic paint residue and mineral spirits dumped down the sink hole.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Medical biohazard sharps container left unattended on park bench.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Hazardous industrial solvent fumes causing breathing difficulty near shed.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Leaking coolant and brake fluid puddle spreading toward rainwater drain.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Dangerous acid carboy with broken seal abandoned beside building 4.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Asbestos ceiling tiles crushed and thrown into open outdoor trash bin.",
+    "category": "Hazardous Waste"
+  },
+  {
+    "text": "Unauthorized dumping of broken tiles and plaster board on empty site.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Pickup truck unloaded old carpets and vinyl flooring in the woods.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Huge pile of scrap lumber and rusted wire fencing dumped by fence.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Someone dumped demolition concrete rubble in front of private driveway.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Large furniture pieces, dining chairs and wardrobe abandoned on street.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Bulk dumping of discarded restaurant packaging and plastic crates.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Truckload of excavated soil and clay dumped in campus drainage path.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Fly-tippers left dozens of worn-out truck tires by the roadside.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Scrap iron and rusted engine parts dumped overnight in the open field.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "Construction debris blocking pedestrian access near university north boundary.",
+    "category": "Illegal Dumping"
+  },
+  {
+    "text": "The hinge of the smart bin lid is broken, flap cannot shut.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Ultrasonic level sensor has fallen into the bin and is submerged.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The solar compacting mechanism is stuck and displaying error code E04.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "SmartBin door handle is broken off and collection staff cannot open it.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The outer steel jacket of the bin is badly dented and deformed.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Solar panel glass is shattered from hail or impact.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "The electronic controller board is wet and short-circuited.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Pedal wire is snapped, stepping on pedal does not lift lid.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Bin body is cracked at the base and tilting onto the ground.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Antenna on SmartBin03 is bent and broken off.",
+    "category": "Damaged Hardware"
+  },
+  {
+    "text": "Putrid smell from rotting organic matter attracting thousands of black flies.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Huge rats seen crawling in and out of the unwashed garbage bin.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "The compost bin is infested with maggots and smells like a sewer.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Unbearable stink from the canteen waste bin making students nauseous.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Mosquitoes breeding in stagnant dirty water inside the bottom of bin.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Rotten eggs and curd smell permeating through the entire corridor.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Worms and larvae crawling on the floor around the dumpster.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Heavy stench of decayed meat coming from the market collection bin.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Vermin and insect infestation around uncollected garbage.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Severe foul odor reported near the campus hostel cafeteria door.",
+    "category": "Odor & Pest Infestation"
+  },
+  {
+    "text": "Dead pigeon trapped inside the dustbin grid decaying in the heat.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Carcass of a stray dog lying near the waste disposal area.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Dead rat found decomposing next to the smart bin sensor.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Decayed animal remains wrapped in a newspaper thrown by the gate.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Dead stray cat causing intense biohazard smell near kindergarten.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Animal carcass bloated and covered in insects near campus lake.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Butcher shop animal bones and entrails dumped in public bin.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Dead crow lying beside the dustbin near academic block entrance.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Decomposed animal body requiring immediate sanitary burial or cremation.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Bloody animal tissue and biohazardous organic remains dumped in park.",
+    "category": "Dead Animal / Biohazard"
+  },
+  {
+    "text": "Someone threw a lit match inside the paper bin, smoke is billowing.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Vandals smashed the electronic sensor screen with a hammer.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Active trash fire in bin near dormitory, flames visible.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "SmartBin05 was pushed over and kicked down the hill by intruders.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Graffiti spray-painted over solar panel and optical sensors.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Smoldering ashes dumped into plastic bin causing it to melt and burn.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Deliberate sabotage: wires cut and internal components ripped out.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Fireworks detonated inside the metal bin causing extensive blast damage.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Smoke pouring out from the campus recycling station.",
+    "category": "Vandalism & Fire Hazard"
+  },
+  {
+    "text": "Bin deliberately tipped into the road causing traffic hazard.",
+    "category": "Vandalism & Fire Hazard"
+  }
+]

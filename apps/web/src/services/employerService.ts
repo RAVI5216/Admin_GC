@@ -1,6 +1,6 @@
 import type { EmployerUser } from '../types/employer';
-
-const API_BASE = 'http://localhost:5000';
+import { API_BASE, getAuthHeaders } from './apiConfig';
+import { dataCache } from './dataCache';
 
 const handleResponse = async (response: Response, serviceName: string, endpoint: string) => {
   const text = await response.text();
@@ -28,7 +28,9 @@ const handleResponse = async (response: Response, serviceName: string, endpoint:
 };
 
 export const fetchEmployers = async (): Promise<EmployerUser[]> => {
-  const response = await fetch(`${API_BASE}/api/employers`);
+  const response = await fetch(`${API_BASE}/api/employers`, {
+    headers: getAuthHeaders(),
+  });
   const data: unknown = await handleResponse(response, 'Employers', 'GET /api/employers');
   if (!Array.isArray(data)) {
     throw new Error('Employer service returned an invalid response');
@@ -40,6 +42,7 @@ export const fetchEmployers = async (): Promise<EmployerUser[]> => {
   if (!data.every(isEmployerUser)) {
     throw new Error('Employer service returned an invalid user record');
   }
+  dataCache.setEmployers(data);
   return data;
 };
 
@@ -59,7 +62,10 @@ export type EmployerIds = {
 };
 
 export const generateEmployerIds = async (): Promise<EmployerIds> => {
-  const response = await fetch(`${API_BASE}/api/employers/ids`, { method: 'POST' });
+  const response = await fetch(`${API_BASE}/api/employers/ids`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
   const data: unknown = await handleResponse(response, 'Employers', 'POST /api/employers/ids');
   if (
     typeof data !== 'object' ||
@@ -80,7 +86,7 @@ export const generateEmployerIds = async (): Promise<EmployerIds> => {
 export const createEmployer = async (employer: CreateEmployerInput): Promise<EmployerUser> => {
   const response = await fetch(`${API_BASE}/api/employers`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(employer),
   });
   const data: unknown = await handleResponse(response, 'Employers', 'POST /api/employers');
@@ -100,7 +106,9 @@ export const createEmployer = async (employer: CreateEmployerInput): Promise<Emp
   ) {
     throw new Error('Employer service returned an invalid user record');
   }
-  return data as EmployerUser;
+  const createdUser = data as EmployerUser;
+  dataCache.addEmployer(createdUser);
+  return createdUser;
 };
 
 export type CreateEmployerTaskInput = {
@@ -124,7 +132,7 @@ export const createEmployerTask = async (
 ): Promise<EmployerTask> => {
   const response = await fetch(`${API_BASE}/api/tasks`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(task),
   });
   const data: unknown = await handleResponse(response, 'Task assignment', 'POST /api/tasks');

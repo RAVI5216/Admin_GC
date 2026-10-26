@@ -1,0 +1,27 @@
+{
+  "name": "smartbin-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GarbageGuardian Smart City IoT & Waste Management Monorepo",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=@smartbin/web",
+    "dev:api": "npm run start --workspace=@smartbin/api",
+    "build:web": "npm run build --workspace=@smartbin/web",
+    "test:web": "npm run test --workspace=@smartbin/web",
+    "test:api": "npm run test-profile --workspace=@smartbin/api",
+    "dev:ml": "python3 services/ml/app.py",
+    "train:ml": "python3 services/ml/train.py"
+  },
+  "keywords": [
+    "smartbin",
+    "iot",
+    "monorepo",
+    "smart-city",
+    "waste-management"
+  ],
+  "author": "SmartCity Team",
+  "license": "ISC"
+}
