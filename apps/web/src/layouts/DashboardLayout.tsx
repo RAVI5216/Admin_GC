@@ -1,15 +1,16 @@
-import { Outlet, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Outlet, NavLink, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Bell, Grid, MapPin, Signal, Settings, FileText,
   AlertTriangle, LogOut, User, Layers, ListChecks,
   Clock3, Users, Search, PanelLeftClose, PanelLeftOpen,
-  Sun, Moon, X, ChevronRight,
+  Sun, Moon, X, ChevronRight, ClipboardList,
 } from 'lucide-react';
 import { useProfile } from '../context/ProfileContext';
 import { useAuth } from '../context/AuthContext';
 import { useSmartBinContext } from '../context/SmartBinContext';
 import { useNotifications } from '../context/NotificationContext';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 /* ── Profile avatar block ──────────────────────────────────────── */
 function ProfileHeader({ collapsed }: { collapsed: boolean }) {
@@ -69,6 +70,7 @@ const navGroups = [
     label: 'Management',
     items: [
       { to: '/employers', label: 'Employers', icon: Users    },
+      { to: '/tasks',     label: 'Tasks',     icon: ClipboardList },
       { to: '/reports',   label: 'Reports',   icon: FileText },
       { to: '/settings',  label: 'Settings',  icon: Settings },
       { to: '/profile',   label: 'Profile',   icon: User     },
@@ -87,13 +89,32 @@ function DashboardLayout() {
   const { logout }       = useAuth();
   const { profile }      = useProfile();
   const { state }        = useSmartBinContext();
-  const { notifications, loading: notificationsLoading } = useNotifications();
+  const { notifications, loading: notificationsLoading, markAllAsSolved } = useNotifications();
   const navigate         = useNavigate();
+  const location         = useLocation();
   const [searchParams]   = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
-  const alertCount       = notifications.length;
+  const alertCount       = useMemo(() => notifications.filter((n) => !n.solved).length, [notifications]);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
+
+  const pageTitle = useMemo(() => {
+    const path = location.pathname;
+    if (path === '/') return { page: 'Dashboard', desc: 'Real-time waste operations' };
+    if (path.startsWith('/live-map')) return { page: 'Live Map', desc: 'Fleet GPS & route tracking' };
+    if (path.startsWith('/analytics')) return { page: 'Analytics', desc: 'Fleet metrics & fill trends' };
+    if (path.startsWith('/smart-bins')) return { page: 'Bin Monitoring', desc: 'Telemetry & sensor readings' };
+    if (path.startsWith('/collection-routes')) return { page: 'Collection Routes', desc: 'Pickup stops & scheduling' };
+    if (path.startsWith('/collection-history')) return { page: 'Collection History', desc: 'Completed routes & logs' };
+    if (path.startsWith('/alerts')) return { page: 'Alerts', desc: 'Active bin notifications' };
+    if (path.startsWith('/employers')) return { page: 'Employers', desc: 'Staff & collector roster' };
+    if (path.startsWith('/tasks')) return { page: 'Tasks', desc: 'Assigned waste collector jobs' };
+    if (path.startsWith('/reports')) return { page: 'Reports', desc: 'Citizen issue submissions' };
+    if (path.startsWith('/settings')) return { page: 'Settings', desc: 'System preferences' };
+    if (path.startsWith('/profile')) return { page: 'Profile', desc: 'Admin account credentials' };
+    if (path.startsWith('/search')) return { page: 'Search Results', desc: 'Query matches' };
+    return { page: 'GarbageGuardian', desc: 'Admin Portal' };
+  }, [location.pathname]);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => window.localStorage.getItem('smartbinSidebarCollapsed') === 'true'
@@ -236,7 +257,7 @@ function DashboardLayout() {
             type="button"
             onClick={handleLogout}
             title={sidebarCollapsed ? 'Logout' : undefined}
-            className={`flex w-full items-center rounded-lg py-2 text-sm text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-300 dark:hover:bg-rose-500/10 light:hover:bg-rose-50 light:text-slate-600 light:hover:text-rose-600 ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-3'}`}
+            className={`flex w-full items-center rounded-lg py-2 text-sm text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-300 ${sidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-3'}`}
           >
             <LogOut size={15} className="shrink-0" />
             {!sidebarCollapsed && <span>Log out</span>}
@@ -251,9 +272,9 @@ function DashboardLayout() {
         <header className="topbar flex h-16 shrink-0 items-center justify-between border-b border-white/[0.06] bg-slate-950/90 px-5 backdrop-blur-md">
           {/* Left: page context */}
           <div className="flex items-center gap-2 text-sm text-slate-500">
-            <span className="font-medium text-slate-300">Dashboard</span>
+            <span className="font-medium text-slate-300">{pageTitle.page}</span>
             <ChevronRight size={14} />
-            <span>Real-time waste operations</span>
+            <span className="hidden sm:inline">{pageTitle.desc}</span>
           </div>
 
           {/* Right: search + notif + user */}
@@ -294,13 +315,24 @@ function DashboardLayout() {
                       <p className="text-sm font-semibold text-white">Notifications</p>
                       <p className="text-xs text-slate-500">{alertCount} active alert{alertCount !== 1 ? 's' : ''}</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowNotifications(false)}
-                      className="rounded-md p-1 text-slate-500 transition hover:bg-white/[0.06] hover:text-slate-300"
-                    >
-                      <X size={14} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {alertCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => void markAllAsSolved()}
+                          className="rounded px-2 py-0.5 text-[11px] font-semibold text-emerald-400 hover:bg-emerald-500/10 transition"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowNotifications(false)}
+                        className="rounded-md p-1 text-slate-500 transition hover:bg-white/[0.06] hover:text-slate-300"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* List */}
@@ -362,7 +394,9 @@ function DashboardLayout() {
         {/* Page content */}
         <main className="flex-1 overflow-y-auto overscroll-contain">
           <div className="p-5 xl:p-6">
-            <Outlet />
+            <ErrorBoundary key={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </main>
       </div>

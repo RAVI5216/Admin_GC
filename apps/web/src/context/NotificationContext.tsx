@@ -1,5 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { fetchNotifications, updateNotificationStatus, NotificationRecord } from '../services/notificationService';
+import {
+  fetchNotifications,
+  updateNotificationStatus,
+  markAllNotificationsAsRead,
+  deleteNotification as apiDeleteNotification,
+  NotificationRecord,
+} from '../services/notificationService';
 
 const NotificationContext = createContext<{
   notifications: NotificationRecord[];
@@ -7,6 +13,8 @@ const NotificationContext = createContext<{
   refreshNotifications: () => Promise<void>;
   markAsSolved: (id: string) => Promise<void>;
   markProblemSolved: (id: string) => Promise<void>;
+  markAllAsSolved: () => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
 } | null>(null);
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
@@ -14,7 +22,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(true);
 
   const loadNotifications = async () => {
-    setLoading(true);
+    if (notifications.length === 0) {
+      setLoading(true);
+    }
     try {
       const data = await fetchNotifications();
       setNotifications(data);
@@ -39,6 +49,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     setNotifications((current) => current.map((item) => (item._id === id ? updated : item)));
   };
 
+  const markAllAsSolved = async () => {
+    await markAllNotificationsAsRead();
+    setNotifications((current) => current.map((item) => ({ ...item, solved: true })));
+  };
+
+  const deleteNotification = async (id: string) => {
+    await apiDeleteNotification(id);
+    setNotifications((current) => current.filter((item) => item._id !== id));
+  };
+
   return (
     <NotificationContext.Provider
       value={{
@@ -47,6 +67,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         refreshNotifications: loadNotifications,
         markAsSolved,
         markProblemSolved,
+        markAllAsSolved,
+        deleteNotification,
       }}
     >
       {children}

@@ -8,6 +8,7 @@ import {
 } from '../services/employerService';
 import { fetchReports, type ReportRecord, unassignReport } from '../services/reportService';
 import type { EmployerUser } from '../types/employer';
+import { dataCache } from '../services/dataCache';
 
 const formatValue = (value: unknown) => {
   if (value === null || value === undefined || value === '') return '—';
@@ -55,12 +56,12 @@ const withReportStatus = (report: ReportRecord, status: string): ReportRecord =>
 };
 
 function EmployersPage() {
-  const [employers, setEmployers] = useState<EmployerUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [employers, setEmployers] = useState<EmployerUser[]>(() => dataCache.getEmployers() || []);
+  const [loading, setLoading] = useState(() => !dataCache.hasEmployers());
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [assignmentEmployer, setAssignmentEmployer] = useState<EmployerUser | null>(null);
-  const [reports, setReports] = useState<ReportRecord[]>([]);
+  const [reports, setReports] = useState<ReportRecord[]>(() => dataCache.getReports() || []);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [reportsError, setReportsError] = useState<string | null>(null);
   const [updatingReportId, setUpdatingReportId] = useState<string | null>(null);
@@ -117,7 +118,9 @@ function EmployersPage() {
     let active = true;
 
     const loadEmployers = async () => {
-      setLoading(true);
+      if (!dataCache.hasEmployers()) {
+        setLoading(true);
+      }
       setError(null);
       try {
         const users = await fetchEmployers();
@@ -369,13 +372,13 @@ function EmployersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10 bg-slate-900/70">
-                {loading ? (
+                {loading && employers.length === 0 ? (
                   <tr>
                     <td colSpan={columns.length + 1} className="px-4 py-6 text-center text-slate-400">
                       Fetching employer users...
                     </td>
                   </tr>
-                ) : error ? (
+                ) : error && employers.length === 0 ? (
                   <tr>
                     <td colSpan={columns.length + 1} className="px-4 py-6 text-center text-slate-400">
                       Employer data could not be loaded.

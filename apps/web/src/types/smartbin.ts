@@ -34,6 +34,7 @@ export interface SmartBinPayload {
     temperatureHistory: { time: string; value: number }[];
     gasLevelHistory: { time: string; value: number }[];
     humidityHistory: { time: string; value: number }[];
+    deviceHistory?: Record<string, { time: string; value: number }[]>;
   };
   alerts: {
     id: string;

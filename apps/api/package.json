@@ -1,5 +1,5 @@
 {
-  "name": "smartbin-backend",
+  "name": "@smartbin/api",
   "version": "1.0.0",
   "description": "Production-ready backend for SmartBin IoT garbage monitoring",
   "main": "server.js",

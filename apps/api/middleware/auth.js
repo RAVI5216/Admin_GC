@@ -1,12 +1,13 @@
 import jwt from 'jsonwebtoken';
 
 const JWT_EXPIRY = '8h';
+const getJwtSecret = () => process.env.JWT_SECRET || 'garbage-guardian-secret-key-change-in-prod';
 
 export const signToken = (payload) =>
-  jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: JWT_EXPIRY });
+  jwt.sign(payload, getJwtSecret(), { expiresIn: JWT_EXPIRY });
 
 export const verifyToken = (token) =>
-  jwt.verify(token, process.env.JWT_SECRET);
+  jwt.verify(token, getJwtSecret());
 
 /**
  * Express middleware — requires a valid Bearer JWT.

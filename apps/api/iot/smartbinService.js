@@ -154,6 +154,17 @@ export class SmartBinIoTService {
 
     const validated = {
       deviceId,
+      ...(payload.location ? { location: validateString(payload.location, 'location') } : {}),
+      ...(payload.latitude !== undefined ? { latitude: validateNumeric(payload.latitude, 'latitude') } : {}),
+      ...(payload.longitude !== undefined ? { longitude: validateNumeric(payload.longitude, 'longitude') } : {}),
+      ...(payload.temperature !== undefined ? { temperature: validateNumeric(payload.temperature, 'temperature') } : {}),
+      ...(payload.humidity !== undefined ? { humidity: validateNumeric(payload.humidity, 'humidity') } : {}),
+      ...(payload.gasLevel !== undefined ? { gasLevel: validateNumeric(payload.gasLevel, 'gasLevel') } : {}),
+      ...(payload.battery !== undefined ? { battery: validateNumeric(payload.battery, 'battery') } : {}),
+      ...(payload.rssi !== undefined ? { rssi: validateNumeric(payload.rssi, 'rssi') } : {}),
+      ...(payload.timestamp ? { timestamp: validateString(payload.timestamp, 'timestamp') } : {}),
+      ...(payload.fillLevel !== undefined ? { fillLevel: validateNumeric(payload.fillLevel, 'fillLevel') } : {}),
+      ...(payload.level !== undefined ? { level: validateNumeric(payload.level, 'level') } : {}),
     };
 
     // Add optional validated fields

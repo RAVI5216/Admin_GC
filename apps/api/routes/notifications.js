@@ -1,8 +1,10 @@
 import { randomUUID } from 'crypto';
 import express from 'express';
 import {
+  DeleteCommand,
   GetCommand,
   PutCommand,
+  ScanCommand,
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 import {
@@ -10,6 +12,7 @@ import {
   dashboardDynamoDb,
   scanDashboardItems,
 } from '../db/dynamo.js';
+import { requireAuth } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
 
 const NOTIFICATION_KEY_PREFIX = 'NOTIFICATION#';
@@ -26,14 +29,20 @@ export const createNotificationsRouter = ({
 } = {}) => {
   const router = express.Router();
 
+  router.use(requireAuth);
+
   router.get('/', async (req, res) => {
     try {
-      const items = await scanDashboardItems(dynamoDb, {
-        TableName: DASH_ADMIN_TABLE_NAME,
-        FilterExpression: '#recordType = :notification',
-        ExpressionAttributeNames: { '#recordType': 'recordType' },
-        ExpressionAttributeValues: { ':notification': 'notification' },
-      });
+      const page = await dynamoDb.send(
+        new ScanCommand({
+          TableName: DASH_ADMIN_TABLE_NAME,
+          FilterExpression: '#recordType = :notification',
+          ExpressionAttributeNames: { '#recordType': 'recordType' },
+          ExpressionAttributeValues: { ':notification': 'notification' },
+          Limit: 60,
+        })
+      );
+      const items = page.Items ?? [];
       items.sort((left, right) => String(right.createdAt ?? '').localeCompare(String(left.createdAt ?? '')));
       return res.json(items.map(toNotificationResponse));
     } catch (error) {
@@ -86,6 +95,58 @@ export const createNotificationsRouter = ({
         error instanceof Error ? error.message : String(error)
       );
       return res.status(500).json({ error: 'Unable to create notification' });
+    }
+  });
+
+  router.put('/mark-all-read', async (req, res) => {
+    try {
+      const page = await dynamoDb.send(
+        new ScanCommand({
+          TableName: DASH_ADMIN_TABLE_NAME,
+          FilterExpression: '#recordType = :notification AND (attribute_not_exists(#solved) OR #solved = :false)',
+          ExpressionAttributeNames: { '#recordType': 'recordType', '#solved': 'solved' },
+          ExpressionAttributeValues: { ':notification': 'notification', ':false': false },
+          Limit: 100,
+        })
+      );
+      const items = page.Items ?? [];
+      const updatedAt = now().toISOString();
+      await Promise.all(
+        items.map((item) =>
+          dynamoDb.send(
+            new UpdateCommand({
+              TableName: DASH_ADMIN_TABLE_NAME,
+              Key: { email: item.email },
+              UpdateExpression: 'SET #solved = :true, #updatedAt = :updatedAt',
+              ExpressionAttributeNames: { '#solved': 'solved', '#updatedAt': 'updatedAt' },
+              ExpressionAttributeValues: { ':true': true, ':updatedAt': updatedAt },
+            })
+          )
+        )
+      );
+      logger.info(`[Notifications] Marked all ${items.length} notifications as read/solved.`);
+      return res.json({ success: true, updatedCount: items.length });
+    } catch (error) {
+      logger.error('Failed to mark all notifications as read', error instanceof Error ? error.message : String(error));
+      return res.status(500).json({ error: 'Failed to mark all notifications as read' });
+    }
+  });
+
+  router.delete('/:id', async (req, res) => {
+    const notificationId = req.params.id;
+    const key = `${NOTIFICATION_KEY_PREFIX}${notificationId}`;
+    try {
+      await dynamoDb.send(
+        new DeleteCommand({
+          TableName: DASH_ADMIN_TABLE_NAME,
+          Key: { email: key },
+        })
+      );
+      logger.info(`[Notifications] Deleted notification ${notificationId}`);
+      return res.json({ success: true, notificationId });
+    } catch (error) {
+      logger.error('Unable to delete notification', error instanceof Error ? error.message : String(error));
+      return res.status(500).json({ error: 'Unable to delete notification' });
     }
   });
 

@@ -2,13 +2,17 @@ import { Circle, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-le
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useMemo, useState } from 'react';
-import { MapPin, Navigation2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { MapPin, Navigation2, Layers } from 'lucide-react';
+import { useSmartBinData } from '../hooks/useSmartBinData';
 
 type PositionTuple = [number, number];
 
 function RecenterMap({ center }: { center: PositionTuple }) {
   const map = useMap();
-  useEffect(() => { map.setView(center, 16); }, [center, map]);
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
   return null;
 }
 
@@ -21,9 +25,27 @@ function createUserIcon() {
   });
 }
 
+function createBinIcon(status: string, fillLevel: number) {
+  const bg = fillLevel > 80 ? '#f43f5e' : fillLevel > 60 ? '#f59e0b' : '#10b981';
+  return L.divIcon({
+    html: `<div style="background-color: ${bg}; width: 28px; height: 28px; border-radius: 50%; border: 2.5px solid #ffffff; box-shadow: 0 0 12px ${bg}; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #ffffff;">${fillLevel}%</div>`,
+    className: 'custom-bin-marker',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
 function LiveMapPage() {
-  const [userLocation,   setUserLocation]   = useState<PositionTuple | null>(null);
-  const [locationError,  setLocationError]  = useState<string | null>(null);
+  const { data } = useSmartBinData();
+  const navigate = useNavigate();
+  const [userLocation, setUserLocation] = useState<PositionTuple | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  const binsWithCoords = useMemo(() => {
+    return (data?.bins ?? []).filter(
+      (b) => typeof b.latitude === 'number' && typeof b.longitude === 'number'
+    );
+  }, [data]);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -38,8 +60,8 @@ function LiveMapPage() {
       (err) => {
         setLocationError(
           err.code === 1
-            ? 'Location access was denied. Please allow access to see your live position.'
-            : 'Unable to read your location. Please try again.'
+            ? 'Location access was denied. Showing smart bin fleet coordinates.'
+            : 'Unable to read your location. Showing smart bin fleet coordinates.'
         );
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
@@ -47,65 +69,122 @@ function LiveMapPage() {
     return () => navigator.geolocation.clearWatch(id);
   }, []);
 
-  const center = useMemo<PositionTuple>(
-    () => userLocation ?? [12.9716, 77.5946],
-    [userLocation]
-  );
+  const center = useMemo<PositionTuple>(() => {
+    if (userLocation) return userLocation;
+    if (binsWithCoords.length > 0) {
+      const avgLat =
+        binsWithCoords.reduce((acc, b) => acc + (b.latitude ?? 0), 0) / binsWithCoords.length;
+      const avgLng =
+        binsWithCoords.reduce((acc, b) => acc + (b.longitude ?? 0), 0) / binsWithCoords.length;
+      return [avgLat, avgLng];
+    }
+    return [22.3039, 70.8022];
+  }, [userLocation, binsWithCoords]);
 
   return (
     <div className="space-y-4">
-
       {/* Page header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-white">Live Location Map</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Map follows your current GPS position in real time.</p>
+          <h1 className="text-xl font-semibold text-white">Live SmartBin Fleet Map</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Real-time GPS positions of smart bins and operator location.
+          </p>
         </div>
-        {/* Status badge */}
-        <div className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold ${
-          userLocation
-            ? 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20'
-            : 'bg-slate-700/30 text-slate-400 ring-1 ring-slate-600/20'
-        }`}>
-          <Navigation2 size={12} className={userLocation ? 'live-dot' : ''} />
-          {userLocation ? 'GPS Active' : 'Acquiring…'}
+        {/* Status badges */}
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-slate-300 ring-1 ring-white/[0.08]">
+            <Layers size={13} className="text-brand-400" />
+            <span>{binsWithCoords.length} Bins On Map</span>
+          </div>
+          <div
+            className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold ${
+              userLocation
+                ? 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/20'
+                : 'bg-slate-700/30 text-slate-400 ring-1 ring-slate-600/20'
+            }`}
+          >
+            <Navigation2 size={12} className={userLocation ? 'live-dot' : ''} />
+            {userLocation ? 'GPS Active' : 'Acquiring GPS…'}
+          </div>
         </div>
       </div>
 
       {/* Map card */}
       <div className="glass-panel shadow-panel overflow-hidden rounded-2xl p-3">
-        <MapContainer center={center} zoom={16} className="relative z-0 h-[600px] w-full rounded-xl">
+        <MapContainer center={center} zoom={14} className="relative z-0 h-[600px] w-full rounded-xl">
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution="&copy; OpenStreetMap contributors"
           />
           <RecenterMap center={center} />
+
+          {/* User Location Marker */}
           {userLocation && (
             <>
               <Circle
                 center={userLocation}
-                radius={80}
+                radius={100}
                 pathOptions={{ color: '#38bdf8', fillColor: '#38bdf8', fillOpacity: 0.12 }}
               />
               <Marker position={userLocation} icon={createUserIcon()}>
                 <Popup>
                   <div className="text-sm text-slate-900">
                     <p className="font-semibold">You are here</p>
-                    <p className="text-xs text-gray-500">Live GPS location</p>
+                    <p className="text-xs text-gray-500">Live operator position</p>
                   </div>
                 </Popup>
               </Marker>
             </>
           )}
+
+          {/* SmartBin Fleet Markers */}
+          {binsWithCoords.map((bin) => (
+            <Marker
+              key={bin.deviceId}
+              position={[bin.latitude!, bin.longitude!]}
+              icon={createBinIcon(bin.status, bin.fillLevel)}
+            >
+              <Popup>
+                <div className="p-1 text-slate-900">
+                  <p className="font-bold text-sm">{bin.location || `Bin ${bin.deviceId}`}</p>
+                  <p className="text-xs text-gray-500">Device: {bin.deviceId}</p>
+                  <div className="mt-2 space-y-1 text-xs">
+                    <p>
+                      <span className="font-semibold">Fill Level:</span> {bin.fillLevel}% (
+                      {bin.status})
+                    </p>
+                    {bin.temperature !== undefined && (
+                      <p>
+                        <span className="font-semibold">Temp:</span> {bin.temperature}°C
+                      </p>
+                    )}
+                    <p className="text-gray-400 text-[10px]">
+                      Updated: {new Date(bin.lastUpdated).toLocaleTimeString()}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/smart-bins/${encodeURIComponent(bin.deviceId)}`)}
+                    className="mt-3 block w-full rounded-md bg-blue-600 px-2 py-1 text-center text-xs font-semibold text-white transition hover:bg-blue-700"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
         </MapContainer>
       </div>
 
       {/* Location info bar */}
-      <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm ${
-        locationError
-          ? 'border-amber-400/20 bg-amber-400/5 text-amber-300'
-          : 'border-white/[0.06] bg-white/[0.02] text-slate-400'
-      }`}>
+      <div
+        className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm ${
+          locationError
+            ? 'border-amber-400/20 bg-amber-400/5 text-amber-300'
+            : 'border-white/[0.06] bg-white/[0.02] text-slate-400'
+        }`}
+      >
         <MapPin size={15} className="shrink-0" />
         {locationError ? (
           <span>{locationError}</span>

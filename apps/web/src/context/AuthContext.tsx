@@ -1,13 +1,13 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-
-const API_BASE = 'http://localhost:5000';
+import React, { createContext, useContext, useState } from 'react';
+import { API_BASE } from '../services/apiConfig';
+import { dataCache } from '../services/dataCache';
 
 const readApiResponse = async (response: Response, fallback: string) => {
   const responseText = await response.text();
   let data: Record<string, unknown>;
 
   try {
-    data = responseText ? JSON.parse(responseText) as Record<string, unknown> : {};
+    data = responseText ? (JSON.parse(responseText) as Record<string, unknown>) : {};
   } catch {
     if (responseText.trimStart().startsWith('<')) {
       throw new Error(
@@ -39,7 +39,7 @@ type AuthContextType = {
   token: string | null;
   loading: boolean;
   savedEmail: string | null;
-  savedPassword: string | null;
+  savedPassword: null;
   login: (email: string, password: string) => Promise<LoginChallenge>;
   verifyLoginOtp: (email: string, code: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<string>;
@@ -54,12 +54,32 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  // Synchronous lazy state initialization from localStorage prevents redirect loops
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem('adminUser');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem('adminToken');
+  });
+
   const [loading, setLoading] = useState(false);
-  const [savedEmail, setSavedEmail] = useState<string | null>(null);
-  const [savedPassword, setSavedPassword] = useState<string | null>(null);
-  const pendingPassword = useRef<string | null>(null);
+
+  const [savedEmail, setSavedEmail] = useState<string | null>(() => {
+    return localStorage.getItem('adminEmail');
+  });
+
+  // Remove any legacy insecure plain text passwords from localStorage
+  React.useEffect(() => {
+    if (localStorage.getItem('adminPassword')) {
+      localStorage.removeItem('adminPassword');
+    }
+  }, []);
 
   const login = async (email: string, password: string) => {
     setLoading(true);
@@ -73,7 +93,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.otpRequired !== true || typeof data.email !== 'string' || typeof data.message !== 'string') {
         throw new Error('The backend returned an invalid login response.');
       }
-      pendingPassword.current = password;
       return { email: data.email, message: data.message };
     } finally {
       setLoading(false);
@@ -92,18 +111,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (typeof data.email !== 'string' || typeof data.name !== 'string' || typeof data.token !== 'string') {
         throw new Error('The backend returned an invalid login verification response.');
       }
-      const user = { name: data.name, email: data.email };
-      setUser(user);
+      const userObj = { name: data.name, email: data.email };
+      setUser(userObj);
       setToken(data.token);
       setSavedEmail(data.email);
-      localStorage.setItem('adminUser', JSON.stringify(user));
+      localStorage.setItem('adminUser', JSON.stringify(userObj));
       localStorage.setItem('adminEmail', data.email);
       localStorage.setItem('adminToken', data.token);
-      if (pendingPassword.current) {
-        setSavedPassword(pendingPassword.current);
-        localStorage.setItem('adminPassword', pendingPassword.current);
-      }
-      pendingPassword.current = null;
     } finally {
       setLoading(false);
     }
@@ -132,9 +146,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof data.message !== 'string') {
       throw new Error('The backend returned an invalid password reset response.');
     }
-    setSavedPassword(null);
-    pendingPassword.current = null;
-    localStorage.removeItem('adminPassword');
     return data.message;
   };
 
@@ -142,8 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setToken(null);
     setSavedEmail(null);
-    setSavedPassword(null);
-    pendingPassword.current = null;
+    dataCache.clearAll();
     localStorage.removeItem('adminUser');
     localStorage.removeItem('adminEmail');
     localStorage.removeItem('adminPassword');
@@ -167,29 +177,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('adminEmail', email);
   };
 
-  const updateSavedPassword = (password: string) => {
-    setSavedPassword(password);
-    localStorage.setItem('adminPassword', password);
-  };
-
-  React.useEffect(() => {
-    const stored = localStorage.getItem('adminUser');
-    if (stored) {
-      setUser(JSON.parse(stored));
-    }
-    const storedToken = localStorage.getItem('adminToken');
-    if (storedToken) {
-      setToken(storedToken);
-    }
-    const storedEmail = localStorage.getItem('adminEmail');
-    if (storedEmail) {
-      setSavedEmail(storedEmail);
-    }
-    const storedPassword = localStorage.getItem('adminPassword');
-    if (storedPassword) {
-      setSavedPassword(storedPassword);
-    }
-  }, []);
+  // Deprecated dummy method to maintain API contract without storing raw password
+  const updateSavedPassword = () => {};
 
   return (
     <AuthContext.Provider
@@ -198,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token,
         loading,
         savedEmail,
-        savedPassword,
+        savedPassword: null,
         login,
         verifyLoginOtp,
         requestPasswordReset,

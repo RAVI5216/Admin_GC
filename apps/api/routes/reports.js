@@ -1,23 +1,25 @@
 import express from 'express';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
-  DynamoDBDocumentClient,
   GetCommand,
   ScanCommand,
   TransactWriteCommand,
 } from '@aws-sdk/lib-dynamodb';
+import {
+  REPORTS_TABLE_NAME as TABLE_NAME,
+  TASKS_TABLE_NAME,
+  dashboardDynamoDb,
+} from '../db/dynamo.js';
+import { requireAuth } from '../middleware/auth.js';
+import { classifyReport, getPythonMLMetrics } from '../services/aiClassifier.js';
 import { logger } from '../utils/logger.js';
-
-const TABLE_NAME = 'GarbageGuardianReports';
-const TASKS_TABLE_NAME = 'GarbageGuardianTasks';
-const dynamoDb = DynamoDBDocumentClient.from(
-  new DynamoDBClient({ region: process.env.AWS_REGION || 'ap-southeast-2' })
-);
+import { recordNotification } from '../services/notificationHelper.js';
 
 const normalizeAttributeName = (value) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-export const createReportsRouter = ({ dynamoDb: client = dynamoDb } = {}) => {
+export const createReportsRouter = ({ dynamoDb: client = dashboardDynamoDb } = {}) => {
   const router = express.Router();
+
+  router.use(requireAuth);
 
   router.get('/', async (req, res) => {
     try {
@@ -35,10 +37,60 @@ export const createReportsRouter = ({ dynamoDb: client = dynamoDb } = {}) => {
         lastEvaluatedKey = result.LastEvaluatedKey;
       } while (lastEvaluatedKey);
 
-      res.json(reports);
+      const enriched = await Promise.all(
+        reports.map(async (r) => {
+          if (r.aiClassification) return r;
+          const text = [r.description, r.issueType, r.issue, r.category].filter(Boolean).join(' ');
+          const classification = await classifyReport(text, r.location || '');
+          return {
+            ...r,
+            aiClassification: classification,
+          };
+        })
+      );
+      res.json(enriched);
     } catch (error) {
       logger.error('Unable to load reports from DynamoDB', error instanceof Error ? error.message : String(error));
       res.status(500).json({ error: 'Unable to load reports' });
+    }
+  });
+
+  router.post('/classify', async (req, res) => {
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    const location = typeof req.body?.location === 'string' ? req.body.location.trim() : '';
+    const shouldNotify = Boolean(req.body?.createNotification);
+    if (!text) {
+      return res.status(400).json({ error: 'Report text is required for AI classification' });
+    }
+    try {
+      const result = await classifyReport(text, location);
+      if (shouldNotify && (result.severity === 'critical' || result.severity === 'high')) {
+        await recordNotification(client, {
+          title: `🚨 AI Urgent Alert: ${result.category}`,
+          message: `${text.slice(0, 100)}${text.length > 100 ? '…' : ''} (Location: ${location || result.extractedLocation || 'Campus Center'}, Urgency: ${result.severity.toUpperCase()}, Confidence: ${Math.round(result.confidence * 100)}%)`,
+          severity: result.severity === 'critical' ? 'critical' : 'warning',
+          location: location || result.extractedLocation || null,
+        });
+      }
+      return res.json(result);
+    } catch (error) {
+      logger.error('AI classification error', error instanceof Error ? error.message : String(error));
+      return res.status(500).json({ error: 'AI classification failed' });
+    }
+  });
+
+  router.get('/ai-metrics', async (req, res) => {
+    try {
+      const metrics = await getPythonMLMetrics();
+      if (!metrics) {
+        return res.status(503).json({
+          error: 'Python ML service is currently offline or metrics not generated. Start python app.py on port 5001.',
+        });
+      }
+      return res.json(metrics);
+    } catch (error) {
+      logger.error('Unable to fetch AI metrics', error instanceof Error ? error.message : String(error));
+      return res.status(500).json({ error: 'Unable to fetch AI evaluation metrics' });
     }
   });
 

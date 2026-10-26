@@ -8,12 +8,19 @@ type LoginMode = 'login' | 'verify-login' | 'request-reset' | 'confirm-reset';
 function LoginPage() {
   const navigate = useNavigate();
   const {
+    user,
     login,
     verifyLoginOtp,
     loading,
     requestPasswordReset,
     resetPassword,
   } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');

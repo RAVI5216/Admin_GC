@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react';
 import socketService from '../services/socketService';
+import { fetchAllBins } from '../services/binService';
 import type { ReactNode } from 'react';
 import type { BinStatus, SmartBinData, SmartBinPayload } from '../types/smartbin';
 
@@ -28,6 +29,7 @@ const initialState: SmartBinState = {
 const SmartBinContext = createContext<{
   state: SmartBinState;
   dispatch: React.Dispatch<SmartBinAction>;
+  refreshBins: () => Promise<void>;
 } | null>(null);
 
 const computeTotals = (bins: SmartBinData[]) => {
@@ -156,10 +158,23 @@ const buildPayloadFromMessage = (message: unknown, previousData: SmartBinPayload
       bins,
       totals: maybePayload.totals ?? computeTotals(bins),
       charts: maybePayload.charts ?? {
-        fillLevelHistory: [],
-        temperatureHistory: [],
-        gasLevelHistory: [],
-        humidityHistory: [],
+        fillLevelHistory: bins.slice(-12).map((b) => ({
+          time: new Date(b.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          value: b.fillLevel,
+        })),
+        temperatureHistory: bins.slice(-12).map((b) => ({
+          time: new Date(b.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          value: b.temperature ?? 28,
+        })),
+        gasLevelHistory: bins.slice(-12).map((b) => ({
+          time: new Date(b.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          value: b.gasLevel ?? 45,
+        })),
+        humidityHistory: bins.slice(-12).map((b) => ({
+          time: new Date(b.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          value: b.humidity ?? 55,
+        })),
+        deviceHistory: previousData?.charts?.deviceHistory ?? {},
       },
       alerts: (payloadAlerts && payloadAlerts.length > 0 ? payloadAlerts : createAlertsFromBins(bins)) as SmartBinPayload['alerts'],
     };
@@ -174,10 +189,17 @@ const buildPayloadFromMessage = (message: unknown, previousData: SmartBinPayload
   const existingBins = previousData?.bins ?? [];
   const updatedBins = [...existingBins.filter((item) => item.deviceId !== bin.deviceId), bin];
   const totals = computeTotals(updatedBins);
-  const latestPoint = { time: bin.lastUpdated, value: bin.fillLevel };
-  const temperaturePoint = { time: bin.lastUpdated, value: bin.temperature };
-  const humidityPoint = { time: bin.lastUpdated, value: bin.humidity };
-  const gasPoint = { time: bin.lastUpdated, value: bin.gasLevel };
+  const timeFormatted = new Date(bin.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const latestPoint = { time: timeFormatted, value: bin.fillLevel };
+  const temperaturePoint = { time: timeFormatted, value: bin.temperature };
+  const humidityPoint = { time: timeFormatted, value: bin.humidity };
+  const gasPoint = { time: timeFormatted, value: bin.gasLevel };
+
+  const prevDevicePoints = previousData?.charts?.deviceHistory?.[bin.deviceId] ?? [];
+  const updatedDeviceHistory = {
+    ...(previousData?.charts?.deviceHistory ?? {}),
+    [bin.deviceId]: [...prevDevicePoints, latestPoint].slice(-24),
+  };
 
   return {
     bins: updatedBins,
@@ -187,6 +209,7 @@ const buildPayloadFromMessage = (message: unknown, previousData: SmartBinPayload
       temperatureHistory: [...(previousData?.charts.temperatureHistory ?? []), temperaturePoint].slice(-12),
       gasLevelHistory: [...(previousData?.charts.gasLevelHistory ?? []), gasPoint].slice(-12),
       humidityHistory: [...(previousData?.charts.humidityHistory ?? []), humidityPoint].slice(-12),
+      deviceHistory: updatedDeviceHistory,
     },
     alerts: createAlertsFromBins(updatedBins) as SmartBinPayload['alerts'],
   };
@@ -215,10 +238,30 @@ export function SmartBinProvider({ children }: { children: ReactNode }) {
 
   latestDataRef.current = state.data;
 
+  const loadInitialBins = async () => {
+    try {
+      const bins = await fetchAllBins();
+      if (bins && bins.length > 0) {
+        const payload = buildPayloadFromMessage({ bins }, latestDataRef.current);
+        if (payload) {
+          dispatch({ type: 'RECEIVE_DATA', payload });
+        }
+      }
+    } catch {
+      // Continue, socket streaming will connect if available
+    }
+  };
+
   useEffect(() => {
     dispatch({ type: 'CONNECTING' });
 
-    const handleConnect = () => dispatch({ type: 'CONNECTED' });
+    // Load bins directly from DynamoDB API on mount
+    loadInitialBins();
+
+    const handleConnect = () => {
+      dispatch({ type: 'CONNECTED' });
+      loadInitialBins();
+    };
     const handleDisconnect = () => dispatch({ type: 'DISCONNECTED' });
     const handleSmartBinData = (payload: unknown) => {
       const normalized = buildPayloadFromMessage(payload, latestDataRef.current);
@@ -242,7 +285,11 @@ export function SmartBinProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return <SmartBinContext.Provider value={{ state, dispatch }}>{children}</SmartBinContext.Provider>;
+  return (
+    <SmartBinContext.Provider value={{ state, dispatch, refreshBins: loadInitialBins }}>
+      {children}
+    </SmartBinContext.Provider>
+  );
 }
 
 export function useSmartBinContext() {

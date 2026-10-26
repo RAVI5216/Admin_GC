@@ -4,7 +4,7 @@ import cors from 'cors';
 import { randomUUID } from 'crypto';
 import { serverConfig } from './config/serverConfig.js';
 import { PutCommand } from '@aws-sdk/lib-dynamodb';
-import { DASH_ADMIN_TABLE_NAME, dashboardDynamoDb } from './db/dynamo.js';
+import { DASH_ADMIN_TABLE_NAME, dashboardDynamoDb, scanDashboardItems } from './db/dynamo.js';
 import { createHealthRouter } from './routes/health.js';
 import { createProfileRouter } from './routes/profile.js';
 import { createNotificationsRouter } from './routes/notifications.js';
@@ -12,15 +12,26 @@ import { createReportsRouter } from './routes/reports.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createEmployerRouter } from './routes/employers.js';
 import { createTasksRouter } from './routes/tasks.js';
+import { createBinsRouter, fetchAllBinsFromDynamo } from './routes/bins.js';
 import { initializeSocket } from './socket/socket.js';
-import { SmartBinIoTService } from './iot/smartbinService.js';
 import { logger } from './utils/logger.js';
+import { autoPruneOldAlerts } from './services/notificationHelper.js';
 
 const app = express();
 const httpServer = http.createServer(app);
 
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((s) => s.trim())
+  : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://localhost:5000'];
+
 const corsOptions = {
-  origin: true,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('Blocked by CORS policy'));
+    }
+  },
   credentials: true,
 };
 
@@ -30,71 +41,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 let iotStatus = { iot: 'Disconnected' };
 
-const saveAlertNotification = async (payload) => {
-  try {
-    const { deviceId, location, status: rawStatus, fillLevel, fillPercentage, timestamp, lastUpdated } = payload;
-    const effectiveFillLevel =
-      typeof fillLevel === 'number'
-        ? fillLevel
-        : typeof fillPercentage === 'number'
-        ? fillPercentage
-        : undefined;
-    const normalizedStatus = typeof rawStatus === 'string' ? rawStatus.trim().toLowerCase() : '';
-    const effectiveStatus =
-      normalizedStatus === 'almost full'
-        ? 'warning'
-        : normalizedStatus === 'full' || normalizedStatus === 'warning' || normalizedStatus === 'offline'
-        ? normalizedStatus
-        : typeof effectiveFillLevel === 'number' && effectiveFillLevel >= 90
-        ? 'full'
-        : typeof effectiveFillLevel === 'number' && effectiveFillLevel >= 70
-        ? 'warning'
-        : 'online';
-    const shouldAlert = effectiveStatus === 'full' || effectiveStatus === 'warning' || effectiveStatus === 'offline';
-    if (!shouldAlert) {
-      return;
-    }
-
-    const title =
-      effectiveStatus === 'full'
-        ? 'Bin Full'
-        : effectiveStatus === 'offline'
-        ? 'Device Offline'
-        : 'High Fill Level';
-    const message =
-      effectiveStatus === 'full'
-        ? `${location ?? deviceId} is full and requires service.`
-        : effectiveStatus === 'offline'
-        ? `${location ?? deviceId} is offline and needs attention.`
-        : `${location ?? deviceId} is ${effectiveFillLevel ?? 'unknown'}% full and approaching capacity.`;
-
-    const notificationId = randomUUID();
-    await dashboardDynamoDb.send(
-      new PutCommand({
-      TableName: DASH_ADMIN_TABLE_NAME,
-      Item: {
-        email: `NOTIFICATION#${notificationId}`,
-        notificationId,
-        recordType: 'notification',
-        title,
-        message,
-        severity: effectiveStatus === 'offline' ? 'critical' : 'warning',
-        solved: false,
-        problemSolved: false,
-        time: timestamp ?? lastUpdated ?? new Date().toISOString(),
-        deviceId: deviceId ?? null,
-        location: location ?? null,
-        createdAt: new Date().toISOString(),
-        updatedAt: null,
-      },
-      ConditionExpression: 'attribute_not_exists(email)',
-      })
-    );
-  } catch (error) {
-    logger.error('Unable to persist alert notification', error instanceof Error ? error.message : String(error));
-  }
-};
-
 const getStatus = () => iotStatus;
 const healthRouter = createHealthRouter(getStatus);
 const profileRouter = createProfileRouter();
@@ -103,6 +49,7 @@ const reportsRouter = createReportsRouter();
 const authRouter = createAuthRouter();
 const employerRouter = createEmployerRouter();
 const tasksRouter = createTasksRouter();
+const binsRouter = createBinsRouter();
 
 app.get('/', (req, res) => {
   res.send('SmartBin Backend Running');
@@ -134,31 +81,51 @@ app.get("/test", (req, res) => {
   });
 });
 app.use('/notifications', notificationsRouter);
+app.use('/api/notifications', notificationsRouter);
 app.use('/reports', reportsRouter);
+app.use('/api/reports', reportsRouter);
 app.use('/auth', authRouter);
+app.use('/api/auth', authRouter);
 app.use('/api/employers', employerRouter);
 app.use('/api/tasks', tasksRouter);
+app.use('/api/bins', binsRouter);
 
 const { broadcastSmartbinData } = initializeSocket(httpServer, corsOptions, logger);
 
-const iotService = new SmartBinIoTService({
-  iotServiceUrl: process.env.SMARTBIN_IOT_SERVICE_URL,
-  onData: async (payload) => {
-    broadcastSmartbinData(payload);
-    await saveAlertNotification(payload);
-  },
-  onStatusChange: (status) => {
-    iotStatus = status;
-  },
-  logger,
-});
+let binSyncInterval = null;
+
+const syncBinsFromDynamo = async () => {
+  try {
+    const bins = await fetchAllBinsFromDynamo(dashboardDynamoDb);
+    if (bins && bins.length > 0) {
+      iotStatus = {
+        iot: 'Connected',
+        mode: 'Direct DynamoDB',
+        binCount: bins.length,
+        lastSync: new Date().toISOString(),
+      };
+      broadcastSmartbinData({ bins });
+    }
+  } catch (err) {
+    logger.warn('Unable to sync bins from DynamoDB', err?.message);
+    iotStatus = { iot: 'Error', error: err?.message };
+  }
+};
 
 const startServer = async () => {
+  // Sync smart bins directly from DynamoDB SmartBins table on startup
   try {
-    await iotService.initialize();
+    await syncBinsFromDynamo();
   } catch (error) {
-    logger.warn('EC2 SmartBin IoT service initialization could not be completed; continuing with HTTP server startup', error instanceof Error ? error.message : String(error));
+    logger.warn('Initial DynamoDB bin sync could not be completed; continuing with HTTP server startup', error instanceof Error ? error.message : String(error));
   }
+
+  // Periodic background sync every 20 seconds
+  binSyncInterval = setInterval(syncBinsFromDynamo, 20000);
+
+  // Auto-retention: prune alerts older than 14 days on startup and daily
+  void autoPruneOldAlerts(dashboardDynamoDb);
+  setInterval(() => void autoPruneOldAlerts(dashboardDynamoDb), 24 * 60 * 60 * 1000);
 
   httpServer.once('error', (error) => {
     if (error.code === 'EADDRINUSE') {
@@ -175,12 +142,12 @@ const startServer = async () => {
 };
 
 const shutdown = async () => {
-  logger.info('Shutdown requested. Closing server and EC2 IoT connection.');
+  logger.info('Shutdown requested. Closing server and database connections.');
+  if (binSyncInterval) clearInterval(binSyncInterval);
   httpServer.close(async (err) => {
     if (err) {
       logger.error('HTTP server shutdown error', err.message);
     }
-    await iotService.disconnect();
     dashboardDynamoDb.destroy();
     process.exit(0);
   });

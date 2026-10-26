@@ -6,10 +6,10 @@ import { User, Mail, Phone, Lock, Shield, Camera } from 'lucide-react';
 function ProfilePage() {
   const profileCtx  = useProfile();
   const { profile, loading: ctxLoading, updateProfile } = profileCtx;
-  const { user, updateUser, updateSavedPassword } = useAuth();
+  const { user, updateUser } = useAuth();
 
-  const [collectorName,   setCollectorName]   = useState('Pankaj Mudholkar');
-  const [role,            setRole]            = useState('Field Collector');
+  const [collectorName,   setCollectorName]   = useState(user?.name ?? '');
+  const [role,            setRole]            = useState('Admin');
   const [email,           setEmail]           = useState('');
   const [phone,           setPhone]           = useState('');
   const [avatar,          setAvatar]          = useState<string | null>(null);
@@ -42,7 +42,7 @@ function ProfilePage() {
     }
     if (password || confirmPassword) {
       if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
-      if (password.length > 0 && password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+      if (password.length > 0 && password.length < 8) { setError('Password must be at least 8 characters.'); return; }
     }
     setSaving(true);
     try {
@@ -55,7 +55,6 @@ function ProfilePage() {
       if (updated.email && updated.email !== user?.email) {
         updateUser({ name: updated.collectorName, email: updated.email });
       }
-      if (password) updateSavedPassword(password);
       setPassword('');
       setConfirmPassword('');
       setMessage('Profile saved successfully.');

@@ -1,13 +1,10 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { USERS_TABLE_NAME, dashboardDynamoDb } from '../db/dynamo.js';
+import { requireAuth } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
 
-const USERS_TABLE_NAME = 'GarbageGuardianUsers';
-const defaultDynamoDb = DynamoDBDocumentClient.from(
-  new DynamoDBClient({ region: process.env.AWS_REGION || 'ap-southeast-2' })
-);
 let lastGeneratedEmployerId = 0;
 
 const generateTimestampId = () => {
@@ -86,12 +83,14 @@ const generateUniqueIds = async (dynamoDb, generateId) => {
 };
 
 export const createEmployerRouter = ({
-  dynamoDb = defaultDynamoDb,
+  dynamoDb = dashboardDynamoDb,
   hashPassword = (password) => bcrypt.hash(password, 10),
   generateId = generateTimestampId,
   now = () => new Date(),
 } = {}) => {
   const router = express.Router();
+
+  router.use(requireAuth);
 
   router.get('/', async (req, res) => {
     try {

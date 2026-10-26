@@ -1,5 +1,11 @@
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
-export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'cancelled';
+export type TaskStatus =
+  | 'pending'
+  | 'in-progress'
+  | 'completed'
+  | 'cancelled'
+  | 'assigned'
+  | 'unassigned';
 
 export interface Task {
   _id: string;

@@ -19,6 +19,8 @@ import { createTask, deleteTask, fetchTasks, updateTaskStatus } from '../service
 import { fetchEmployers } from '../services/employerService';
 import { fetchReports } from '../services/reportService';
 import { useSmartBinContext } from '../context/SmartBinContext';
+import { useNotifications } from '../context/NotificationContext';
+import { dataCache } from '../services/dataCache';
 import type { Task, TaskPriority } from '../types/task';
 import type { Employer } from '../types/employer';
 import type { ReportRecord } from '../services/reportService';
@@ -27,7 +29,7 @@ import type { ReportRecord } from '../services/reportService';
 
 const priorityOrder: TaskPriority[] = ['critical', 'high', 'medium', 'low'];
 
-const priorityMeta: Record<TaskPriority, { label: string; classes: string; dot: string }> = {
+const priorityMeta: Record<string, { label: string; classes: string; dot: string }> = {
   critical: {
     label: 'Critical',
     classes: 'bg-rose-500/10 text-rose-300 ring-1 ring-rose-500/20',
@@ -50,11 +52,21 @@ const priorityMeta: Record<TaskPriority, { label: string; classes: string; dot: 
   },
 };
 
-const statusMeta: Record<Task['status'], { label: string; classes: string; icon: JSX.Element }> = {
+const statusMeta: Record<string, { label: string; classes: string; icon: JSX.Element }> = {
   pending: {
     label: 'Pending',
     classes: 'bg-slate-700/60 text-slate-300 ring-1 ring-slate-500/20',
     icon: <CircleDashed size={12} />,
+  },
+  unassigned: {
+    label: 'Unassigned',
+    classes: 'bg-slate-700/60 text-slate-300 ring-1 ring-slate-500/20',
+    icon: <CircleDashed size={12} />,
+  },
+  assigned: {
+    label: 'Assigned',
+    classes: 'bg-indigo-500/10 text-indigo-300 ring-1 ring-indigo-500/20',
+    icon: <User size={12} />,
   },
   'in-progress': {
     label: 'In Progress',
@@ -71,6 +83,16 @@ const statusMeta: Record<Task['status'], { label: string; classes: string; icon:
     classes: 'bg-rose-500/10 text-rose-300 ring-1 ring-rose-500/20',
     icon: <XCircle size={12} />,
   },
+};
+
+const getPriorityMeta = (priority?: string) => {
+  const p = String(priority || '').toLowerCase().trim();
+  return priorityMeta[p] ?? priorityMeta.medium;
+};
+
+const getStatusMeta = (status?: string) => {
+  const s = String(status || '').toLowerCase().trim();
+  return statusMeta[s] ?? statusMeta.pending;
 };
 
 const binStatusMeta: Record<string, { label: string; color: string }> = {
@@ -146,7 +168,8 @@ function AssignTaskModal({ employees, reports, bins, onClose, onAssigned }: Assi
   const [error, setError] = useState<string | null>(null);
 
   // Derive selected objects
-  const employee = employees.find((e) => e._id === selectedEmployee);
+  const getEmpId = (e: Employer) => (e._id || e.userId || e.employeeId || '');
+  const employee = employees.find((e) => getEmpId(e) === selectedEmployee);
   const report = reports.find((r) => r.reportId === selectedReport);
   const bin = bins.find((b) => b.deviceId === selectedBin);
 
@@ -159,7 +182,7 @@ function AssignTaskModal({ employees, reports, bins, onClose, onAssigned }: Assi
     }
   }, [mode, report, bin]);
 
-  const availableEmployees = employees.filter((e) => e.status === 'available');
+  const availableEmployees = employees.filter((e) => !e.status || e.status === 'available');
 
   const handleSubmit = async () => {
     if (!title.trim()) return setError('Title is required');
@@ -172,10 +195,10 @@ function AssignTaskModal({ employees, reports, bins, onClose, onAssigned }: Assi
       const payload = {
         title: title.trim(),
         description: description.trim(),
-        employeeId: employee!._id,
-        employeeName: employee!.name,
-        employeeEmail: employee!.email,
-        employeeRole: employee!.role,
+        employeeId: getEmpId(employee!),
+        employeeName: employee!.name || 'Employee',
+        employeeEmail: employee!.email || '',
+        employeeRole: employee!.role || 'employee',
         reportId: mode === 'report' && report ? String(report.reportId) : null,
         reportTitle: mode === 'report' && report ? String(report.reportId) : null,
         binId: mode === 'bin' && bin ? bin.deviceId : null,
@@ -262,11 +285,14 @@ function AssignTaskModal({ employees, reports, bins, onClose, onAssigned }: Assi
               className={inputCls}
             >
               <option value="">— Select employee —</option>
-              {availableEmployees.map((emp) => (
-                <option key={emp._id} value={emp._id}>
-                  {emp.name} · {emp.role}
-                </option>
-              ))}
+              {availableEmployees.map((emp) => {
+                const id = getEmpId(emp);
+                return (
+                  <option key={id} value={id}>
+                    {emp.name || id} · {emp.role || 'Employee'}
+                  </option>
+                );
+              })}
               {availableEmployees.length === 0 && (
                 <option disabled>No available employees</option>
               )}
@@ -451,8 +477,8 @@ function TaskCard({
   onDelete: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const pm = priorityMeta[task.priority];
-  const sm = statusMeta[task.status];
+  const pm = getPriorityMeta(task.priority);
+  const sm = getStatusMeta(task.status);
 
   return (
     <div className="rounded-xl border border-white/[0.06] bg-slate-900 p-4 transition hover:border-white/[0.10]">
@@ -486,7 +512,7 @@ function TaskCard({
             </button>
             {open && (
               <div className="absolute right-0 top-full z-20 mt-1 w-36 rounded-xl border border-white/[0.08] bg-slate-800 shadow-xl">
-                {(Object.keys(statusMeta) as Task['status'][]).map((s) => (
+                {(['pending', 'in-progress', 'completed', 'cancelled'] as Task['status'][]).map((s) => (
                   <button
                     key={s}
                     type="button"
@@ -495,8 +521,8 @@ function TaskCard({
                       task.status === s ? 'text-brand-300' : 'text-slate-300'
                     }`}
                   >
-                    {statusMeta[s].icon}
-                    {statusMeta[s].label}
+                    {statusMeta[s]?.icon ?? statusMeta.pending.icon}
+                    {statusMeta[s]?.label ?? s}
                   </button>
                 ))}
               </div>
@@ -547,13 +573,14 @@ function TaskCard({
 /* ── Main Page ──────────────────────────────────────────────────── */
 
 function TasksPage() {
+  const { refreshNotifications } = useNotifications();
   const { state: binState } = useSmartBinContext();
   const bins = binState.data?.bins ?? [];
 
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [employees, setEmployees] = useState<Employer[]>([]);
-  const [reports, setReports] = useState<ReportRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [tasks, setTasks] = useState<Task[]>(() => dataCache.getTasks() || []);
+  const [employees, setEmployees] = useState<Employer[]>(() => dataCache.getEmployers() || []);
+  const [reports, setReports] = useState<ReportRecord[]>(() => dataCache.getReports() || []);
+  const [loading, setLoading] = useState(() => !dataCache.hasTasks());
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState<Task['status'] | 'all'>('all');
@@ -561,12 +588,14 @@ function TasksPage() {
 
   /* load */
   const loadAll = async () => {
-    setLoading(true);
+    if (!dataCache.hasTasks()) {
+      setLoading(true);
+    }
     try {
       const [t, e, r] = await Promise.all([fetchTasks(), fetchEmployers(), fetchReports()]);
-      setTasks(t);
-      setEmployees(e);
-      setReports(r);
+      setTasks(Array.isArray(t) ? t : []);
+      setEmployees(Array.isArray(e) ? e : []);
+      setReports(Array.isArray(r) ? r : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -576,35 +605,40 @@ function TasksPage() {
 
   useEffect(() => { loadAll(); }, []);
 
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+
   /* derived */
   const summary = useMemo(
     () => ({
-      total: tasks.length,
-      pending: tasks.filter((t) => t.status === 'pending').length,
-      inProgress: tasks.filter((t) => t.status === 'in-progress').length,
-      completed: tasks.filter((t) => t.status === 'completed').length,
+      total: safeTasks.length,
+      pending: safeTasks.filter((t) => t.status === 'pending' || t.status === 'unassigned').length,
+      inProgress: safeTasks.filter((t) => t.status === 'in-progress' || t.status === 'assigned').length,
+      completed: safeTasks.filter((t) => t.status === 'completed').length,
     }),
-    [tasks]
+    [safeTasks]
   );
 
   const filtered = useMemo(() => {
-    return tasks.filter((t) => {
-      const matchStatus = filterStatus === 'all' || t.status === filterStatus;
-      const matchPriority = filterPriority === 'all' || t.priority === filterPriority;
+    return safeTasks.filter((t) => {
+      const normStatus = t.status === 'unassigned' ? 'pending' : t.status === 'assigned' ? 'in-progress' : t.status;
+      const matchStatus = filterStatus === 'all' || t.status === filterStatus || normStatus === filterStatus;
+      const matchPriority = filterPriority === 'all' || (t.priority || 'medium').toLowerCase() === filterPriority;
       return matchStatus && matchPriority;
     });
-  }, [tasks, filterStatus, filterPriority]);
+  }, [safeTasks, filterStatus, filterPriority]);
 
   /* handlers */
   const handleAssigned = (task: Task) => {
     setTasks((prev) => [task, ...prev]);
     setShowModal(false);
+    void refreshNotifications();
   };
 
   const handleStatusChange = async (id: string, status: Task['status']) => {
     try {
       const updated = await updateTaskStatus(id, status);
       setTasks((prev) => prev.map((t) => (t._id === id ? updated : t)));
+      void refreshNotifications();
     } catch {
       /* silently ignore */
     }
@@ -682,12 +716,12 @@ function TasksPage() {
       </div>
 
       {/* ── Content ────────────────────────────────────────────── */}
-      {loading ? (
+      {loading && tasks.length === 0 ? (
         <div className="flex items-center justify-center py-20 text-slate-500">
           <Loader2 size={24} className="animate-spin mr-3" />
           Loading tasks…
         </div>
-      ) : error ? (
+      ) : error && tasks.length === 0 ? (
         <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-6 text-center text-sm text-rose-300">
           {error}
         </div>

@@ -1,11 +1,32 @@
 import { Bell, Droplet, MapPin, Truck, Zap, AlertTriangle } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import { useSmartBinData } from '../hooks/useSmartBinData';
+import { useNotifications } from '../context/NotificationContext';
 import StatCard from '../components/StatCard';
 import StatusBadge from '../components/StatusBadge';
+
+function RecenterDashboardMap({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
+  return null;
+}
+
+function createBinIcon(status: string, fillLevel: number) {
+  const bg = fillLevel > 80 ? '#f43f5e' : fillLevel > 60 ? '#f59e0b' : '#10b981';
+  return L.divIcon({
+    html: `<div style="background-color: ${bg}; width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid #ffffff; box-shadow: 0 0 10px ${bg}; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #ffffff;">${fillLevel}%</div>`,
+    className: 'custom-bin-marker',
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
 
 /* ── Fill level helper ─────────────────────────────────────────── */
 function fillColor(level: number) {
@@ -36,6 +57,13 @@ const PIE_COLORS: Record<string, string> = {
 
 function DashboardPage() {
   const { data, connected } = useSmartBinData();
+  const { notifications } = useNotifications();
+  const navigate = useNavigate();
+
+  const activeAlerts = useMemo(
+    () => notifications.filter((n) => !n.solved),
+    [notifications]
+  );
 
   if (!data) {
     return (
@@ -78,7 +106,7 @@ function DashboardPage() {
         liveMapBins.reduce((s, b) => s + (b.longitude ?? 0), 0) / liveMapBins.length,
       ];
     }
-    return [1.3521, 103.8198];
+    return [22.3676, 70.7976];
   }, [liveMapBins]);
 
   const notFullCount  = data.bins.filter((b) => b.fillLevel <= 60).length;
@@ -110,10 +138,10 @@ function DashboardPage() {
         />
         <StatCard
           label="Active Alerts"
-          value={data.totals.liveAlerts}
+          value={activeAlerts.length}
           icon={<Bell size={18} />}
-          accent={data.totals.liveAlerts > 0 ? 'rose' : 'emerald'}
-          highlight={data.totals.liveAlerts > 0 ? 'Needs attention' : 'All clear'}
+          accent={activeAlerts.length > 0 ? 'rose' : 'emerald'}
+          highlight={activeAlerts.length > 0 ? 'Needs attention' : 'All clear'}
         />
         <StatCard
           label="Bins over 80%"
@@ -149,16 +177,43 @@ function DashboardPage() {
 
           <div className="overflow-hidden rounded-xl border border-white/[0.07]">
             {liveMapBins.length > 0 ? (
-              <MapContainer center={center} zoom={11} className="h-[440px] w-full" scrollWheelZoom={false}>
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png" />
+              <MapContainer center={center} zoom={15} className="h-[440px] w-full" scrollWheelZoom={false}>
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution="&copy; OpenStreetMap contributors"
+                />
+                <RecenterDashboardMap center={center} />
                 {liveMapBins.map((bin) => (
-                  <Marker key={bin.deviceId} position={[bin.latitude as number, bin.longitude as number]}>
+                  <Marker
+                    key={bin.deviceId}
+                    position={[bin.latitude as number, bin.longitude as number]}
+                    icon={createBinIcon(bin.status, bin.fillLevel)}
+                  >
                     <Popup>
-                      <div className="text-slate-900 text-sm">
-                        <p className="font-semibold">{bin.location}</p>
-                        <p className="text-xs text-gray-500">{bin.deviceId}</p>
-                        <p className="mt-1">Fill: <strong>{bin.fillLevel}%</strong></p>
-                        <p>Status: <strong>{bin.status}</strong></p>
+                      <div className="text-slate-900 text-sm p-1">
+                        <p className="font-bold">{bin.location || bin.deviceId}</p>
+                        <p className="text-xs text-gray-500">Device: {bin.deviceId}</p>
+                        <div className="mt-2 space-y-1 text-xs">
+                          <p>
+                            <span className="font-semibold">Fill Level:</span> {bin.fillLevel}% (
+                            {bin.status})
+                          </p>
+                          {bin.temperature !== undefined && (
+                            <p>
+                              <span className="font-semibold">Temp:</span> {bin.temperature}°C
+                            </p>
+                          )}
+                          <p className="text-gray-400 text-[10px]">
+                            Updated: {new Date(bin.lastUpdated).toLocaleTimeString()}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/smart-bins/${encodeURIComponent(bin.deviceId)}`)}
+                          className="mt-3 block w-full rounded-md bg-blue-600 px-2 py-1 text-center text-xs font-semibold text-white transition hover:bg-blue-700"
+                        >
+                          View Details
+                        </button>
                       </div>
                     </Popup>
                   </Marker>
@@ -190,21 +245,33 @@ function DashboardPage() {
             </div>
 
             <div className="flex-1 space-y-2 overflow-y-auto">
-              {data.alerts.length === 0 ? (
+              {activeAlerts.length === 0 ? (
                 <div className="flex h-32 items-center justify-center rounded-xl border border-dashed border-white/[0.07] text-center">
                   <div>
                     <p className="text-sm font-medium text-slate-400">No active alerts</p>
-                    <p className="mt-1 text-xs text-slate-600">Bins operating normally</p>
+                    <p className="mt-1 text-xs text-slate-600">All notifications resolved</p>
                   </div>
                 </div>
               ) : (
-                data.alerts.slice(0, 5).map((alert) => (
+                activeAlerts.slice(0, 5).map((alert) => (
                   <div
-                    key={alert.id}
-                    className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3"
+                    key={alert._id}
+                    onClick={() => navigate('/alerts')}
+                    className="cursor-pointer rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 transition hover:bg-white/[0.05]"
                   >
-                    <p className="text-xs font-semibold text-white">{alert.title}</p>
-                    <p className="mt-0.5 text-xs text-slate-500 line-clamp-2">{alert.message}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-white">{alert.title}</p>
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                          alert.severity === 'critical'
+                            ? 'bg-rose-500/20 text-rose-300'
+                            : 'bg-amber-400/20 text-amber-300'
+                        }`}
+                      >
+                        {alert.severity}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-400 line-clamp-2">{alert.message}</p>
                     <p className="mt-1.5 text-[10px] text-slate-600">{alert.time}</p>
                   </div>
                 ))
@@ -213,7 +280,7 @@ function DashboardPage() {
 
             <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-900/60 px-3 py-2.5 text-xs">
               <span className="text-slate-500">Active alerts</span>
-              <span className="font-semibold text-white">{data.totals.liveAlerts}</span>
+              <span className="font-semibold text-white">{activeAlerts.length}</span>
             </div>
           </div>
 

@@ -1,10 +1,13 @@
-import { useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { ShieldCheck, Thermometer, Wind, BatteryCharging, Droplet, MapPin } from 'lucide-react';
+import { ShieldCheck, Thermometer, Wind, BatteryCharging, Droplet, MapPin, ArrowLeft, Clock } from 'lucide-react';
 import { useSmartBinData } from '../hooks/useSmartBinData';
+import { fetchBinById } from '../services/binService';
+import type { SmartBinData } from '../types/smartbin';
+import { computeBinChartData } from '../utils/chartDataHelper';
 import StatusBadge from '../components/StatusBadge';
 
 /* ── Telemetry tile ────────────────────────────────────────────── */
@@ -38,22 +41,55 @@ function TelemetryTile({
 }
 
 function BinDetailsPage() {
-  const { id }   = useParams();
+  const { id } = useParams();
+  const navigate = useNavigate();
   const { data } = useSmartBinData();
-  const bin      = useMemo(() => data?.bins.find((b) => b.deviceId === id), [data, id]);
+  const [directBin, setDirectBin] = useState<SmartBinData | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  if (!bin) {
+  const bin = useMemo(() => {
+    return data?.bins.find((b) => b.deviceId === id) || directBin;
+  }, [data, id, directBin]);
+
+  useEffect(() => {
+    if (!bin && id) {
+      setLoading(true);
+      fetchBinById(id)
+        .then((fetched) => setDirectBin(fetched))
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }
+  }, [id, bin]);
+
+  if (loading) {
     return (
       <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-white/[0.06] bg-slate-900/60 text-center">
-        <div>
-          <p className="text-base font-semibold text-white">Select a bin from the fleet</p>
-          <p className="mt-1.5 text-sm text-slate-500">Navigate to Bin Monitoring and click a row.</p>
-        </div>
+        <p className="text-sm text-slate-400">Loading smart bin details from database…</p>
       </div>
     );
   }
 
-  const chartData    = data?.charts.fillLevelHistory.slice(-12) ?? [];
+  if (!bin) {
+    return (
+      <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-white/[0.06] bg-slate-900/60 p-6 text-center">
+        <p className="text-base font-semibold text-white">Smart bin not found</p>
+        <p className="mt-1.5 text-sm text-slate-500">The device ID might be incorrect or hasn't checked in.</p>
+        <button
+          type="button"
+          onClick={() => navigate('/smart-bins')}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-white/[0.1]"
+        >
+          <ArrowLeft size={13} /> Return to Fleet Monitoring
+        </button>
+      </div>
+    );
+  }
+
+  const { chartData, isStale, staleLabel } = useMemo(() => {
+    const history = (bin && data?.charts?.deviceHistory?.[bin.deviceId]) || [];
+    return computeBinChartData(bin, history);
+  }, [bin, data?.charts?.deviceHistory]);
+
   const fillColor    = bin.fillLevel > 80 ? 'text-rose-300' : bin.fillLevel > 60 ? 'text-amber-300' : 'text-emerald-300';
   const fillBarColor = bin.fillLevel > 80 ? 'bg-rose-500'   : bin.fillLevel > 60 ? 'bg-amber-400'   : 'bg-emerald-500';
 
@@ -93,16 +129,29 @@ function BinDetailsPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <TelemetryTile icon={<Thermometer size={14} />}    label="Temperature" value={`${bin.temperature}°C`} accent="amber" />
               <TelemetryTile icon={<Droplet size={14} />}        label="Fill Level"  value={`${bin.fillLevel}%`}   accent="sky"   />
-              <TelemetryTile icon={<BatteryCharging size={14} />}label="Battery"     value={`${bin.battery}%`}     accent="emerald" />
+              <TelemetryTile icon={<BatteryCharging size={14} />}label="Battery"     value={bin.battery <= 5 ? `${bin.battery} V` : `${bin.battery}%`} accent="emerald" />
               <TelemetryTile icon={<Wind size={14} />}           label="Signal"      value={`${bin.rssi} dBm`}     accent="violet" />
             </div>
           </div>
 
           {/* Fill level chart */}
           <div className="glass-panel shadow-card rounded-2xl p-5">
-            <div className="mb-4 flex items-center gap-2 text-slate-400">
-              <ShieldCheck size={15} />
-              <span className="text-sm font-semibold text-white">Fill Level History</span>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-slate-400">
+                <ShieldCheck size={15} />
+                <span className="text-sm font-semibold text-white">Fill Level History</span>
+              </div>
+              {isStale ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-300">
+                  <Clock size={12} />
+                  Steady {bin.fillLevel}% • {staleLabel}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {staleLabel || 'Live Telemetry Stream'}
+                </span>
+              )}
             </div>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
@@ -115,7 +164,7 @@ function BinDetailsPage() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                   <XAxis dataKey="time" tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} tick={{ fill: '#475569', fontSize: 11 }} axisLine={false} tickLine={false} unit="%" />
                   <Tooltip
                     contentStyle={{
                       background: 'var(--chart-tooltip-bg)',
@@ -124,6 +173,7 @@ function BinDetailsPage() {
                       borderRadius: '10px',
                       fontSize: '12px',
                     }}
+                    formatter={(val: any) => [`${val}%`, 'Fill Level']}
                   />
                   <Area type="monotone" dataKey="value" stroke="#38bdf8" strokeWidth={2} fill="url(#fillGrad)" dot={false} />
                 </AreaChart>

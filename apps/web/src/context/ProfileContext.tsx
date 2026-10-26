@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
+import { API_BASE } from '../services/apiConfig';
 
 type Profile = {
   collectorName: string;
@@ -8,8 +9,6 @@ type Profile = {
   phone: string;
   avatar?: string | null;
 };
-
-const API_BASE = 'http://localhost:5000';
 
 type ProfileUpdatePayload = Partial<Profile> & { password?: string | null };
 type ProfileResponse = Profile & { token?: string };
