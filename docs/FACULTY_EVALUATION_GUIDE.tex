@@ -1,0 +1,177 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{tcolorbox}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{tabularx}
+
+% --- Color Palette ---
+\definecolor{primary}{RGB}{15, 76, 129}     % Classic Navy
+\definecolor{secondary}{RGB}{40, 116, 166}  % Soft Slate Blue
+\definecolor{accent}{RGB}{235, 245, 255}    % Subtle Light Blue
+\definecolor{darkgray}{RGB}{45, 55, 72}     % Body Text Gray
+\definecolor{codebg}{RGB}{247, 250, 252}    % Code block background
+\definecolor{bordercolor}{RGB}{203, 213, 225}% Box border
+
+% --- Hyperlink Setup ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primary,
+    filecolor=primary,
+    urlcolor=secondary
+}
+
+% --- Typography & Spacing ---
+\setlist{nosep, leftmargin=1.5em}
+\titleformat{\section}{\color{primary}\large\bfseries}{}{0em}{}[\vspace{-0.3em}\rule{\textwidth}{0.8pt}\vspace{0.2em}]
+\titleformat{\subsection}{\color{secondary}\normalsize\bfseries}{}{0em}{}
+
+% --- Header & Footer ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{gray} GarbageGuardian --- Faculty Evaluation Guide}
+\fancyhead[R]{\small\color{gray} \today}
+\fancyfoot[C]{\small\color{gray} Page \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% --- Code Block Box ---
+\newtcolorbox{codebox}{
+    colback=codebg,
+    colframe=bordercolor,
+    boxrule=0.6pt,
+    arc=3pt,
+    left=6pt, right=6pt, top=4pt, bottom=4pt,
+    fontupper=\small\ttfamily
+}
+
+% --- Callout Box ---
+\newtcolorbox{infobox}{
+    colback=accent,
+    colframe=secondary,
+    boxrule=0.8pt,
+    arc=4pt,
+    left=8pt, right=8pt, top=6pt, bottom=6pt
+}
+
+\begin{document}
+
+% --- Header Banner ---
+\begin{center}
+    {\huge \bfseries \color{primary} GarbageGuardian}\\[0.3em]
+    {\large \bfseries \color{secondary} Project Run \& Evaluation Guide}\\[0.4em]
+    {\small \color{darkgray} \textbf{Repository:} \url{https://github.com/RAVI5216/Admin_GC}}
+\end{center}
+\vspace{0.3em}
+
+\noindent\textbf{Platform Summary:} GarbageGuardian is an IoT fleet monitoring and municipal waste management platform integrating live hardware telemetry, scikit-learn NLP incident triage, and field task dispatch across a modern React, Express, and AWS DynamoDB architecture.
+
+\vspace{0.6em}
+
+% --- Section 1: Quickstart ---
+\section*{1. How to Run the Project}
+An automated script inspects your laptop's software stack (Node.js, npm, Python 3, venv, AWS CLI), installs required packages, and starts all services concurrently.
+
+\subsection*{Step 1: Open Terminal / Command Prompt in the Project Folder}
+\begin{codebox}
+# If using Git:
+git clone https://github.com/RAVI5216/Admin_GC.git
+cd Admin_GC
+
+# If using the extracted Admin_GC_Source.zip archive:
+cd Admin_GC
+\end{codebox}
+
+\subsection*{Step 2: Execute the Automated Launcher}
+\begin{itemize}
+    \item \textbf{On macOS / Linux:}
+    \begin{codebox}
+    ./scripts/run_for_faculty.sh
+    \end{codebox}
+    \item \textbf{On Windows (Command Prompt / PowerShell):}
+    \begin{codebox}
+    scripts\run_for_faculty.bat
+    \end{codebox}
+\end{itemize}
+
+\vspace{0.4em}
+
+% --- Section 2: Credentials ---
+\section*{2. Evaluation Credentials}
+
+\subsection*{A. AWS Database Connection (Prompted in Terminal)}
+When the launcher script starts, enter the following AWS IAM credentials when prompted:
+\vspace{0.3em}
+\begin{center}
+\begin{tabularx}{\textwidth}{l X}
+\toprule
+\textbf{Configuration Field} & \textbf{Value to Enter} \\
+\midrule
+\textbf{AWS Access Key ID} & \texttt{[PASTE\_YOUR\_IAM\_ACCESS\_KEY\_HERE]} \\
+\textbf{AWS Secret Access Key} & \texttt{[PASTE\_YOUR\_IAM\_SECRET\_KEY\_HERE]} \\
+\textbf{AWS Region} & \texttt{ap-southeast-2} \textit{(press Enter for default)} \\
+\bottomrule
+\end{tabularx}
+\end{center}
+\vspace{-0.2em}
+\textit{\small Note: Credentials are saved locally to \texttt{apps/api/.env} and will not be re-requested on future runs.}
+
+\subsection*{B. Administrator Portal Sign-In}
+Once the services start, navigate to \url{http://localhost:5173} in your browser:
+\vspace{0.3em}
+\begin{center}
+\begin{tabularx}{\textwidth}{l X}
+\toprule
+\textbf{Field} & \textbf{Value} \\
+\midrule
+\textbf{Portal URL} & \url{http://localhost:5173} \\
+\textbf{Email} & \texttt{[PASTE\_YOUR\_ADMIN\_EMAIL\_HERE]} \\
+\textbf{Password} & \texttt{[PASTE\_YOUR\_ADMIN\_PASSWORD\_HERE]} \\
+\textbf{2FA OTP Code} & \texttt{123456} \textit{(Email OTP is bypassed for evaluation; enter if prompted)} \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\vspace{0.4em}
+
+% --- Section 3: Service Endpoints ---
+\section*{3. Active Service Endpoints}
+\begin{center}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+\textbf{Service} & \textbf{Local URL} & \textbf{Function} \\
+\midrule
+\textbf{Frontend Portal} & \url{http://localhost:5173} & React 18 Admin Dashboard \& Map GIS \\
+\textbf{Backend REST API} & \url{http://localhost:5000} & REST API, WebSockets \& DynamoDB Bridge \\
+\textbf{Python ML Service} & \url{http://localhost:5001} & Scikit-Learn NLP Incident Classifier \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\vspace{0.4em}
+
+% --- Section 4: Key Features ---
+\section*{4. Key Features to Test in the Web Portal}
+\begin{enumerate}
+    \item \textbf{Dashboard (\texttt{/})}: Overview fleet capacity gauge, active incident tally, and live sensor area charts.
+    \item \textbf{Live GIS Map (\texttt{/map})}: Interactive Leaflet map with color-coded status halos (Normal, Warning, Overflow).
+    \item \textbf{Smart Bins Fleet (\texttt{/bins})}: Multi-sensor diagnostics (ultrasonic distance, temperature, humidity, gas).
+    \item \textbf{Citizen Reports \& AI Classifier (\texttt{/reports})}: NLP complaint triage with severity and department routing.
+    \item \textbf{Task Dispatch (\texttt{/tasks})}: Real-time assignment and tracking of waste collection tasks for field crews.
+    \item \textbf{Employer Roster (\texttt{/employers})}: Registry for sanitation personnel with automated Employee IDs.
+\end{enumerate}
+
+\vspace{0.4em}
+
+% --- Section 5: Stopping Services ---
+\section*{5. Stopping the Application}
+Press \textbf{\texttt{Ctrl + C}} in the terminal window to safely terminate all services concurrently.
+
+\end{document}
