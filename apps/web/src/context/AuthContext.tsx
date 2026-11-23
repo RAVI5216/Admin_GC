@@ -90,6 +90,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
       const data = await readApiResponse(res, 'Login failed');
+      if (typeof data.token === 'string') {
+        const userEmail = typeof data.email === 'string' ? data.email : email;
+        const userName = typeof data.name === 'string' ? data.name : userEmail;
+        const userObj = { name: userName, email: userEmail };
+        setUser(userObj);
+        setToken(data.token);
+        setSavedEmail(userEmail);
+        localStorage.setItem('adminUser', JSON.stringify(userObj));
+        localStorage.setItem('adminEmail', userEmail);
+        localStorage.setItem('adminToken', data.token);
+        return { email: userEmail, message: 'Login successful' };
+      }
       if (data.otpRequired !== true || typeof data.email !== 'string' || typeof data.message !== 'string') {
         throw new Error('The backend returned an invalid login response.');
       }
