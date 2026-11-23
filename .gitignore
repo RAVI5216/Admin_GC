@@ -49,3 +49,9 @@ yarn-error.log*
 
 # Archives
 *.zip
+
+# Local Faculty PDF & LaTeX Guides (not pushed to remote)
+docs/FACULTY_EVALUATION_GUIDE.pdf
+docs/FACULTY_EVALUATION_GUIDE.tex
+*.pdf
+*.tex
