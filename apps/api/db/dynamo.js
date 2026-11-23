@@ -1,5 +1,8 @@
+import dotenv from 'dotenv';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
+
+dotenv.config();
 
 export const DASH_ADMIN_TABLE_NAME = 'GarbageGuardianDashAdmin';
 export const USERS_TABLE_NAME = 'GarbageGuardianUsers';
@@ -10,6 +13,14 @@ export const SMARTBINS_TABLE_NAME = 'SmartBins';
 const clientConfig = {
   region: process.env.AWS_REGION || 'ap-southeast-2',
   ...(process.env.DYNAMODB_ENDPOINT ? { endpoint: process.env.DYNAMODB_ENDPOINT } : {}),
+  ...(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+    ? {
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID.trim(),
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY.trim(),
+        },
+      }
+    : {}),
 };
 
 export const dashboardDynamoDb = DynamoDBDocumentClient.from(

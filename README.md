@@ -75,20 +75,35 @@ cd ../..
 
 ### 3. Running Services Locally
 
-You can launch each service from the root directory:
+You can run all services using **one single command** or by launching them in **separate terminal tabs**.
 
+### Option A: One-Command Startup (Recommended)
+From the repository root:
 ```bash
-# Terminal 1: Backend API (Port 5000)
-npm run dev:api
-
-# Terminal 2: Python ML Microservice (Port 5001)
-npm run dev:ml
-
-# Terminal 3: Web Admin Portal (Port 5173)
-npm run dev:web
+npm run dev
 ```
+*(This uses `concurrently` to start the Web Portal, Express API, and Python ML service simultaneously).*
 
-Once started, open [http://localhost:5173](http://localhost:5173) in your browser.
+---
+
+### Option B: Dedicated Terminal Windows (Recommended for Debugging)
+
+If you prefer to inspect logs for each service individually:
+
+* **Terminal 1 — Express Backend API (Port 5000)**:
+  ```bash
+  npm run dev:api
+  ```
+* **Terminal 2 — Python ML Microservice (Port 5001)**:
+  ```bash
+  npm run dev:ml
+  ```
+  *(Or: `services/ml/venv/bin/python services/ml/app.py`)*
+
+* **Terminal 3 — React Web Portal (Port 5173)**:
+  ```bash
+  npm run dev:web
+  ```
 
 ---
 

@@ -7,13 +7,15 @@
     "apps/*"
   ],
   "scripts": {
+    "dev": "concurrently -n WEB,API,ML -c blue,green,yellow \"npm run dev:web\" \"npm run dev:api\" \"npm run dev:ml\"",
     "dev:web": "npm run dev --workspace=@smartbin/web",
     "dev:api": "npm run start --workspace=@smartbin/api",
     "build:web": "npm run build --workspace=@smartbin/web",
     "test:web": "npm run test --workspace=@smartbin/web",
     "test:api": "npm run test-profile --workspace=@smartbin/api",
-    "dev:ml": "python3 services/ml/app.py",
-    "train:ml": "python3 services/ml/train.py"
+    "dev:ml": "node scripts/run_ml.mjs",
+    "train:ml": "python3 services/ml/train.py",
+    "start:faculty": "bash scripts/run_for_faculty.sh"
   },
   "keywords": [
     "smartbin",
@@ -23,5 +25,8 @@
     "waste-management"
   ],
   "author": "SmartCity Team",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
 }
